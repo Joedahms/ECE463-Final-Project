@@ -55,7 +55,8 @@ void checkCommandLineArguments(int argc, char **argv, bool *debugFlag) {
  * Output: None
  */
 void sendUdpMessage(int udpSocketDescriptor,
-                    struct sockaddr_in destinationAddress, char *message,
+                    struct sockaddr_in destinationAddress,
+                    char *message,
                     bool debugFlag) {
   if (debugFlag) {
     printf("Sending UDP message:\n");
@@ -64,10 +65,10 @@ void sendUdpMessage(int udpSocketDescriptor,
            ntohs(destinationAddress.sin_port));
   }
 
-  int sendtoReturn = 0;
-  sendtoReturn = sendto(udpSocketDescriptor, message, strlen(message), 0,
-                        (struct sockaddr *)&destinationAddress,
-                        sizeof(destinationAddress));
+  long int sendtoReturn = 0;
+  sendtoReturn =
+      sendto(udpSocketDescriptor, message, strlen(message), 0,
+             (struct sockaddr *)&destinationAddress, sizeof(destinationAddress));
   if (sendtoReturn == -1) {
     perror("UDP send error");
     exit(1);
@@ -86,13 +87,15 @@ void sendUdpMessage(int udpSocketDescriptor,
  * - Debug flag
  * Output: None
  */
-void printReceivedMessage(struct sockaddr_in sender, int bytesReceived,
-                          char *message, bool debugFlag) {
+void printReceivedMessage(struct sockaddr_in sender,
+                          long int bytesReceived,
+                          char *message,
+                          bool debugFlag) {
   if (debugFlag) {
     unsigned long senderAddress = ntohl(sender.sin_addr.s_addr);
-    unsigned short senderPort = ntohs(sender.sin_port);
-    printf("Received %d byte message from %ld:%d:\n", bytesReceived,
-           senderAddress, senderPort);
+    unsigned short senderPort   = ntohs(sender.sin_port);
+    printf("Received %ld byte message from %ld:%d:\n", bytesReceived, senderAddress,
+           senderPort);
     printf("%s\n", message);
   }
 }
@@ -112,9 +115,9 @@ int readFile(char *fileName, char *buffer, bool debugFlag) {
   // Open the file
   int fileDescriptor;
   printf("Opening file %s...\n", fileName);
-  fileDescriptor =
-      open(fileName, O_CREAT,
-           O_RDWR); // Create if does not exist + read and write mode
+
+  // Create if does not exist + read and write mode
+  fileDescriptor = open(fileName, O_CREAT, O_RDWR);
   if (fileDescriptor == -1) {
     perror("Error opening file");
     return -1;
@@ -127,7 +130,7 @@ int readFile(char *fileName, char *buffer, bool debugFlag) {
     perror("Error getting file size");
     return -1;
   };
-  unsigned long int fileSize = fileInformation.st_size;
+  long int fileSize = fileInformation.st_size;
   if (debugFlag) {
     printf("%s is %ld bytes\n", fileName, fileSize);
   }
@@ -135,7 +138,7 @@ int readFile(char *fileName, char *buffer, bool debugFlag) {
   // Read out the contents of the file
   printf("Reading file...\n");
   ssize_t bytesReadFromFile = 0;
-  bytesReadFromFile = read(fileDescriptor, buffer, fileSize);
+  bytesReadFromFile         = read(fileDescriptor, buffer, (long unsigned int)fileSize);
   if (bytesReadFromFile == -1) {
     perror("Error reading file");
     return -1;
@@ -159,17 +162,18 @@ int readFile(char *fileName, char *buffer, bool debugFlag) {
  * - 0: Success
  */
 int writeFile(char *fileName, char *fileContents, size_t fileSize) {
-  // Open file to write to
   int fileDesciptor;
-  fileDesciptor = open(fileName, (O_CREAT | O_RDWR),
-                       S_IRWXU); // Create if doesn't exist. Read/write
+
+  // Open file to write to
+  // Create if doesn't exist. Read/write
+  fileDesciptor = open(fileName, (O_CREAT | O_RDWR), S_IRWXU);
   if (fileDesciptor == -1) {
     perror("Error opening file");
     return -1;
   }
 
   // Write to the new file
-  int writeReturn = write(fileDesciptor, fileContents, fileSize);
+  long int writeReturn = write(fileDesciptor, fileContents, (long unsigned int)fileSize);
   if (writeReturn == -1) {
     perror("File write error");
     return -1;
@@ -202,6 +206,7 @@ int setupUdpSocket(struct sockaddr_in serverAddress, bool bindFlag) {
   if (fcntlReturn == -1) {
     perror("Error when setting UDP socket non blocking");
   }
+
   printf("UDP socket set up\n");
 
   if (!bindFlag) {              // If bind flag is not set
@@ -209,9 +214,8 @@ int setupUdpSocket(struct sockaddr_in serverAddress, bool bindFlag) {
   }
   // Bind UDP socket
   printf("Binding UDP socket...\n");
-  int bindReturnUDP =
-      bind(udpSocketDescriptor, (struct sockaddr *)&serverAddress,
-           sizeof(serverAddress)); // Bind
+  int bindReturnUDP = bind(udpSocketDescriptor, (struct sockaddr *)&serverAddress,
+                           sizeof(serverAddress)); // Bind
   if (bindReturnUDP == -1) {
     perror("Error when binding UDP socket");
     exit(1);
@@ -234,13 +238,14 @@ int setupUdpSocket(struct sockaddr_in serverAddress, bool bindFlag) {
  * 1: There is an incoming message
  */
 int checkUdpSocket(int listeningUDPSocketDescriptor,
-                   struct sockaddr_in *incomingAddress, char *message,
+                   struct sockaddr_in *incomingAddress,
+                   char *message,
                    bool debugFlag) {
   socklen_t incomingAddressLength = sizeof(incomingAddress);
-  int bytesReceived =
+  long int bytesReceived =
       recvfrom(listeningUDPSocketDescriptor, message, 250, 0,
                (struct sockaddr *)incomingAddress, &incomingAddressLength);
-  int nonBlockingReturn = handleErrorNonBlocking(bytesReceived);
+  int nonBlockingReturn = handleErrorNonBlocking((int)bytesReceived);
 
   // No incoming message
   if (nonBlockingReturn == 1) {
@@ -262,9 +267,8 @@ int checkUdpSocket(int listeningUDPSocketDescriptor,
  */
 int handleErrorNonBlocking(int returnValue) {
   if (returnValue == -1) {
-    if (errno == EAGAIN ||
-        errno == EWOULDBLOCK) { // Errors occuring from no message on non
-                                // blocking socket
+    // Errors occuring from no message on non blocking socket
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
       return 1;
     } else { // Relevant error
       perror("Error when checking non blocking socket");
