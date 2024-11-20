@@ -38,28 +38,23 @@ int main(int argc, char* argv[]) {
   serverAddress.sin_addr.s_addr = INADDR_ANY;
 
   // Local UDP port
-  struct sockaddr_in udpAddress;
-  memset(&udpAddress, 0, sizeof(udpAddress));
+  struct sockaddr_in hostUdpAddress;
+  memset(&hostUdpAddress, 0, sizeof(hostUdpAddress));
   bool bindFlag       = false;
-  udpSocketDescriptor = setupUdpSocket(udpAddress, bindFlag);
+  udpSocketDescriptor = setupUdpSocket(hostUdpAddress, bindFlag);
 
   // Local TCP port
-  struct sockaddr_in tcpAddress;
-  memset(&tcpAddress, 0, sizeof(tcpAddress));
-  tcpAddress.sin_port = 0; // Wildcard
-  tcpSocketDescriptor = setupTcpSocket(tcpAddress);
+  struct sockaddr_in hostTcpAddress;
+  memset(&hostTcpAddress, 0, sizeof(hostTcpAddress));
+  hostTcpAddress.sin_port = 0; // Wildcard
+  tcpSocketDescriptor     = setupTcpSocket(hostTcpAddress);
 
-  /*
-  struct sockaddr_in test;
-  socklen_t testLen = sizeof(test);
-  getsockname(tcpSocketDescriptor, (struct sockaddr*)&test, &testLen);
-  printf("%d\n", ntohs(test.sin_port));
-  */
+  hostTcpAddress = getTcpSocketInfo();
 
   bool debugFlag = false;
   checkCommandLineArguments(argc, argv, &debugFlag);
 
-  if (sendConnectionPacket(serverAddress, debugFlag) == -1) {
+  if (sendConnectionPacket(hostTcpAddress, serverAddress, debugFlag) == -1) {
     printf("Error sending connection packet\n");
   }
 
@@ -168,7 +163,9 @@ int getAvailableResources(char* availableResources, const char* directoryName) {
  * -1: Error constructing or sending the connection packet, the packet was not sent
  * 0: Packet successfully sent
  */
-int sendConnectionPacket(struct sockaddr_in serverAddress, bool debugFlag) {
+int sendConnectionPacket(struct sockaddr_in hostTcpAddress,
+                         struct sockaddr_in serverAddress,
+                         bool debugFlag) {
   struct PacketFields packetFields;
 
   // Type
@@ -180,6 +177,16 @@ int sendConnectionPacket(struct sockaddr_in serverAddress, bool debugFlag) {
   strcpy(packetFields.data, username);
   strncat(packetFields.data, packetDelimiters.subfield, packetDelimiters.subfieldLength);
   free(username);
+
+  // Tcp socket
+  char ipAddress[64];
+  sprintf(ipAddress, "%d", hostTcpAddress.sin_addr.s_addr);
+  char port[64];
+  sprintf(port, "%d", hostTcpAddress.sin_port);
+  strcat(packetFields.data, ipAddress);
+  strcat(packetFields.data, packetDelimiters.subfield);
+  strcat(packetFields.data, port);
+  strcat(packetFields.data, packetDelimiters.subfield);
 
   // Available resources
   char* availableResources = calloc(1, MAX_DATA);
@@ -351,4 +358,11 @@ void setUsername(char* username) {
     }
     free(userInput);
   }
+}
+
+struct sockaddr_in getTcpSocketInfo() {
+  struct sockaddr_in socketInfo;
+  socklen_t socketInfoSize = sizeof(socketInfo);
+  getsockname(tcpSocketDescriptor, (struct sockaddr*)&socketInfo, &socketInfoSize);
+  return socketInfo;
 }

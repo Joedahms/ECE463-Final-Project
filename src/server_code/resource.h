@@ -11,12 +11,12 @@
 struct Resource {
   char username[MAX_USERNAME];
   char filename[MAX_FILENAME];
-  struct Resource *next;
+  struct Resource* next;
 };
 
-struct Resource *addResource(struct Resource *, char *, char *);
-char *makeResourceString(char *, struct Resource *, char *);
-void printAllResources(struct Resource *);
-struct Resource *removeUserResources(char *, struct Resource *, bool);
+struct Resource* addResource(struct Resource*, char*, char*);
+char* makeResourceString(char*, struct Resource*, char*);
+void printAllResources(struct Resource*);
+struct Resource* removeUserResources(char*, struct Resource*, bool);
 
 #endif

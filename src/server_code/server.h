@@ -14,6 +14,7 @@
 struct ConnectedClient {
   char username[MAX_USERNAME];
   struct sockaddr_in socketUdpAddress;
+  struct sockaddr_in socketTcpAddress;
   bool status;          // If the client is connected or not
   bool requestedStatus; // If the server has sent a request asking if the client
                         // is still connnected

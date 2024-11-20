@@ -235,6 +235,8 @@ void printAllConnectedClients() {
   printf("\n*** PRINTING ALL CONNECTED CLIENTS ***\n");
   unsigned long udpAddress;
   unsigned short udpPort;
+  unsigned long tcpAddress;
+  unsigned short tcpPort;
   char* username = calloc(1, MAX_USERNAME);
 
   int i;
@@ -245,12 +247,17 @@ void printAllConnectedClients() {
       i++;
       continue;
     }
+    tcpAddress = ntohl(connectedClients[i].socketTcpAddress.sin_addr.s_addr);
+    tcpPort    = ntohs(connectedClients[i].socketTcpAddress.sin_port);
     strcpy(username, connectedClients[i].username);
+
     printf("CONNECTED CLIENT %d\n", i);
     printf("USERNAME: %s\n", username);
     memset(username, 0, MAX_USERNAME);
     printf("UDP ADDRESS: %ld\n", udpAddress);
     printf("UDP PORT: %d\n", udpPort);
+    printf("TCP ADDRESS: %ld\n", tcpAddress);
+    printf("TCP PORT: %d\n", tcpPort);
   }
   free(username);
   printf("\n");
@@ -309,6 +316,21 @@ void handleConnectionPacket(char* packetData,
   char* usernameBeginning = username;
   packetData              = readPacketSubfield(packetData, username, debugFlag);
   strcpy(emptyClient->username, username);
+
+  char* tcpInfo = calloc(1, 64);
+  char* end;
+
+  packetData   = readPacketSubfield(packetData, tcpInfo, debugFlag);
+  long address = strtol(tcpInfo, &end, 10);
+  emptyClient->socketTcpAddress.sin_addr.s_addr = (unsigned int)address;
+
+  memset(tcpInfo, 0, 64);
+
+  packetData = readPacketSubfield(packetData, tcpInfo, debugFlag);
+  long port  = strtol(tcpInfo, &end, 10);
+  emptyClient->socketTcpAddress.sin_port = (unsigned short)port;
+
+  free(tcpInfo);
 
   addResourcesToDirectory(packetData, strlen(packetData), username, debugFlag);
 
