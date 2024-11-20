@@ -34,16 +34,17 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-void checkCommandLineArguments(int, char **, bool *);
-void sendUdpMessage(int, struct sockaddr_in, char *, bool);
-void printReceivedMessage(struct sockaddr_in, long int, char *, bool);
+void checkCommandLineArguments(int, char**, bool*);
+void getUserInput(char*);
+void sendUdpMessage(int, struct sockaddr_in, char*, bool);
+void printReceivedMessage(struct sockaddr_in, long int, char*, bool);
 
 // File I/O
-int readFile(char *, char *, bool);
-int writeFile(char *, char *, size_t);
+int readFile(char*, char*, bool);
+int writeFile(char*, char*, size_t);
 
 int setupUdpSocket(struct sockaddr_in, bool);
-int checkUdpSocket(int, struct sockaddr_in *, char *, bool);
+int checkUdpSocket(int, struct sockaddr_in*, char*, bool);
 int handleErrorNonBlocking(int);
 
 #endif

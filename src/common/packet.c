@@ -7,7 +7,7 @@
 
 #include "packet.h"
 
-static const char *packetTypes[NUM_PACKET_TYPES] = {"connection", "status", "resource"};
+static const char* packetTypes[NUM_PACKET_TYPES] = {"connection", "status", "resource"};
 
 struct PacketDelimiters packetDelimiters = {
     1,
@@ -17,23 +17,6 @@ struct PacketDelimiters packetDelimiters = {
     9,
     "endpacket" // end
 };
-
-/*
- * Purpose: Check if at the end of the data field of a packet
- * Input:
- * - The packet to check if at the end of
- * Output:
- * 0: Not at the end of data
- * 1: At the end of data
- */
-/*
-static bool checkEnd(char *packet) {
-  if (strncmp(packet, packetDelimiters.end, packetDelimiters.endLength) == 0) {
-    return true;
-  }
-  return false;
-}
-*/
 
 /*
  * Purpose: Take in the type of the packet as a string and return an integer associated
@@ -47,7 +30,7 @@ static bool checkEnd(char *packet) {
  * 2 = resource
  * Notes: Might look at using an enum for packet type
  */
-int getPacketType(char *packetType, bool debugFlag) {
+int getPacketType(char* packetType, bool debugFlag) {
   if (debugFlag) {
   }
   int returnVal = -1;
@@ -69,7 +52,7 @@ int getPacketType(char *packetType, bool debugFlag) {
  * - Debug flag
  * Output: None
  */
-void buildPacket(char *builtPacket, struct PacketFields packetFields, bool debugFlag) {
+void buildPacket(char* builtPacket, struct PacketFields packetFields, bool debugFlag) {
   // Type
   strcpy(builtPacket, packetFields.type);
   strncat(builtPacket, packetDelimiters.field, packetDelimiters.fieldLength);
@@ -100,9 +83,9 @@ void buildPacket(char *builtPacket, struct PacketFields packetFields, bool debug
  * Output:
  * - 0
  */
-int readPacket(char *packetToBeRead, struct PacketFields *packetFields, bool debugFlag) {
-  char *packet      = calloc(1, MAX_PACKET);
-  char *packetStart = packet;
+int readPacket(char* packetToBeRead, struct PacketFields* packetFields, bool debugFlag) {
+  char* packet      = calloc(1, MAX_PACKET);
+  char* packetStart = packet;
   strcpy(packet, packetToBeRead);
 
   // Type. Advance after reading type (set packet to return val) so that data can be read.
@@ -124,7 +107,7 @@ int readPacket(char *packetToBeRead, struct PacketFields *packetFields, bool deb
  * - Debug flag
  * Output: Packet after reading a field from it
  */
-char *readPacketField(char *packet, char *field, bool debugFlag) {
+char* readPacketField(char* packet, char* field, bool debugFlag) {
   if (debugFlag) {
     printf("Reading field from packet: %s\n", packet);
   }
@@ -149,7 +132,7 @@ char *readPacketField(char *packet, char *field, bool debugFlag) {
  *
  * Output: Field after reading a subfield from it
  */
-char *readPacketSubfield(char *field, char *subfield, bool debugFlag) {
+char* readPacketSubfield(char* field, char* subfield, bool debugFlag) {
   if (debugFlag) {
     printf("Reading subfield from packet field: %s\n", field);
   }
@@ -165,4 +148,14 @@ char *readPacketSubfield(char *field, char *subfield, bool debugFlag) {
     printf("Subfield read: %s\n", subfield);
   }
   return field;
+}
+
+void sendUdpPacket(int socketDescriptor,
+                   struct sockaddr_in destinationAddress,
+                   struct PacketFields packetFields,
+                   bool debugFlag) {
+  char* packet = calloc(1, MAX_PACKET);
+  buildPacket(packet, packetFields, debugFlag);
+  sendUdpMessage(socketDescriptor, destinationAddress, packet, debugFlag);
+  free(packet);
 }

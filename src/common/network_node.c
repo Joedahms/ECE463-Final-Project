@@ -19,8 +19,8 @@
  * - Debug flag
  * Output: None
  */
-void checkCommandLineArguments(int argc, char **argv, bool *debugFlag) {
-  char *programName = argv[0];
+void checkCommandLineArguments(int argc, char** argv, bool* debugFlag) {
+  char* programName = argv[0];
   programName += 2;
 
   switch (argc) {
@@ -46,6 +46,16 @@ void checkCommandLineArguments(int argc, char **argv, bool *debugFlag) {
 }
 
 /*
+ * Purpose: Get user input from standard in and remove the newline
+ * Input: String to store user input in
+ * Output: None
+ */
+void getUserInput(char* userInput) {
+  fgets(userInput, MAX_USER_INPUT, stdin);
+  userInput[strcspn(userInput, "\n")] = 0;
+}
+
+/*
  * Purpose: Send a message via UDP
  * Input:
  * - Socket to send the message out on
@@ -56,7 +66,7 @@ void checkCommandLineArguments(int argc, char **argv, bool *debugFlag) {
  */
 void sendUdpMessage(int udpSocketDescriptor,
                     struct sockaddr_in destinationAddress,
-                    char *message,
+                    char* message,
                     bool debugFlag) {
   if (debugFlag) {
     printf("Sending UDP message:\n");
@@ -68,7 +78,7 @@ void sendUdpMessage(int udpSocketDescriptor,
   long int sendtoReturn = 0;
   sendtoReturn =
       sendto(udpSocketDescriptor, message, strlen(message), 0,
-             (struct sockaddr *)&destinationAddress, sizeof(destinationAddress));
+             (struct sockaddr*)&destinationAddress, sizeof(destinationAddress));
   if (sendtoReturn == -1) {
     perror("UDP send error");
     exit(1);
@@ -82,14 +92,14 @@ void sendUdpMessage(int udpSocketDescriptor,
  * Purpose: Print out a message along with where it came from
  * Input:
  * - Who sent the message
- * - How long the received message is
+ * - How long the received message is in bytes
  * - The received message
  * - Debug flag
  * Output: None
  */
 void printReceivedMessage(struct sockaddr_in sender,
                           long int bytesReceived,
-                          char *message,
+                          char* message,
                           bool debugFlag) {
   if (debugFlag) {
     unsigned long senderAddress = ntohl(sender.sin_addr.s_addr);
@@ -105,13 +115,13 @@ void printReceivedMessage(struct sockaddr_in sender,
  * Purpose: Open a file and read from it
  * Input:
  * - File name
- * - Buffer to store the read contents
+ * - Buffer to store the read contents in
  * - Debug flag
  * Output:
  * - -1: Error
  * - 0: Success
  */
-int readFile(char *fileName, char *buffer, bool debugFlag) {
+int readFile(char* fileName, char* buffer, bool debugFlag) {
   // Open the file
   int fileDescriptor;
   printf("Opening file %s...\n", fileName);
@@ -161,7 +171,7 @@ int readFile(char *fileName, char *buffer, bool debugFlag) {
  * - -1: Error
  * - 0: Success
  */
-int writeFile(char *fileName, char *fileContents, size_t fileSize) {
+int writeFile(char* fileName, char* fileContents, size_t fileSize) {
   int fileDesciptor;
 
   // Open file to write to
@@ -209,12 +219,12 @@ int setupUdpSocket(struct sockaddr_in serverAddress, bool bindFlag) {
 
   printf("UDP socket set up\n");
 
-  if (!bindFlag) {              // If bind flag is not set
-    return udpSocketDescriptor; // Return and do not bind the socket
+  // Maybe bind UDP socket
+  if (!bindFlag) {
+    return udpSocketDescriptor;
   }
-  // Bind UDP socket
   printf("Binding UDP socket...\n");
-  int bindReturnUDP = bind(udpSocketDescriptor, (struct sockaddr *)&serverAddress,
+  int bindReturnUDP = bind(udpSocketDescriptor, (struct sockaddr*)&serverAddress,
                            sizeof(serverAddress)); // Bind
   if (bindReturnUDP == -1) {
     perror("Error when binding UDP socket");
@@ -238,13 +248,13 @@ int setupUdpSocket(struct sockaddr_in serverAddress, bool bindFlag) {
  * 1: There is an incoming message
  */
 int checkUdpSocket(int listeningUDPSocketDescriptor,
-                   struct sockaddr_in *incomingAddress,
-                   char *message,
+                   struct sockaddr_in* incomingAddress,
+                   char* message,
                    bool debugFlag) {
   socklen_t incomingAddressLength = sizeof(incomingAddress);
   long int bytesReceived =
       recvfrom(listeningUDPSocketDescriptor, message, 250, 0,
-               (struct sockaddr *)incomingAddress, &incomingAddressLength);
+               (struct sockaddr*)incomingAddress, &incomingAddressLength);
   int nonBlockingReturn = handleErrorNonBlocking((int)bytesReceived);
 
   // No incoming message

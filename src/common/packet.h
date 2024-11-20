@@ -27,11 +27,13 @@ struct PacketFields {
   char data[MAX_DATA];
 };
 
-int getPacketType(char *, bool);
-void buildPacket(char *, struct PacketFields, bool);
+int getPacketType(char*, bool);
+void buildPacket(char*, struct PacketFields, bool);
 
-int readPacket(char *, struct PacketFields *, bool);
-char *readPacketField(char *, char *, bool);
-char *readPacketSubfield(char *, char *, bool);
+int readPacket(char*, struct PacketFields*, bool);
+char* readPacketField(char*, char*, bool);
+char* readPacketSubfield(char*, char*, bool);
+
+void sendUdpPacket(int, struct sockaddr_in, struct PacketFields, bool);
 
 #endif

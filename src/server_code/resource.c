@@ -175,7 +175,6 @@ void printAllResources(struct Resource* headResource) {
  * - Resource at the head of the resource directory. If resources are removed from the
  * beginning of the directory, the head will change.
  */
-
 struct Resource* removeUserResources(char* username,
                                      struct Resource* headResource,
                                      bool debugFlag) {

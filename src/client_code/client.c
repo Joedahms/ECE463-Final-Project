@@ -18,19 +18,20 @@
 
 // Global so that signal handler can free resources
 int udpSocketDescriptor;
-char *packet;
+char* packet;
 
 // Packet delimiters that are constant for all packets
 // See packet.h & packet.c
 extern struct PacketDelimiters packetDelimiters;
 
 // Main
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   // Assign callback function to handle ctrl-c
   signal(SIGINT, shutdownClient);
 
   // Address of server
   struct sockaddr_in serverAddress;
+  memset(&serverAddress, 0, sizeof(serverAddress));
   serverAddress.sin_family      = AF_INET;
   serverAddress.sin_port        = htons(PORT);
   serverAddress.sin_addr.s_addr = INADDR_ANY;
@@ -66,21 +67,19 @@ int main(int argc, char *argv[]) {
 
     // User input
     if (FD_ISSET(0, &read_fds)) {
-      char *userInput = calloc(1, MAX_USER_INPUT);
+      char* userInput = calloc(1, MAX_USER_INPUT);
       getUserInput(userInput);
 
       if (strcmp(userInput, "resources") == 0) {
         sendResourcePacket(serverAddress, debugFlag);
       }
 
-      printf("here1\n");
       // User just pressed return
       if (strlen(userInput) == 0) {
         free(userInput);
         continue;
       }
       free(userInput);
-      printf("here2\n");
     }
 
     // No message in UDP queue
@@ -93,38 +92,7 @@ int main(int argc, char *argv[]) {
       printf("Packet received\n");
     }
     recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
-
-    struct PacketFields packetFields;
-    memset(&packetFields, 0, sizeof(packetFields));
-    readPacket(packet, &packetFields, debugFlag);
-
-    int packetType = getPacketType(packetFields.type, debugFlag);
-    switch (packetType) {
-    // Connection
-    case 0:
-      if (debugFlag) {
-        printf("Type of packet recieved is connection\n");
-      }
-      break;
-
-    // Status
-    case 1:
-      if (debugFlag) {
-        printf("Type of packet received is status\n");
-      }
-      handleStatusPacket(serverAddress, debugFlag);
-      break;
-
-    // Resource
-    case 2:
-      if (debugFlag) {
-        printf("Type of packet received is Resource\n");
-      }
-      handleResourcePacket(packetFields.data, debugFlag);
-      break;
-
-    default:
-    }
+    handlePacket(serverAddress, debugFlag);
   }
   return 0;
 }
@@ -142,16 +110,6 @@ void shutdownClient() {
 }
 
 /*
- * Purpose: Get user input from standard in and remove the newline
- * Input: String to store user input in
- * Output: None
- */
-void getUserInput(char *userInput) {
-  fgets(userInput, MAX_USER_INPUT, stdin);
-  userInput[strcspn(userInput, "\n")] = 0;
-}
-
-/*
  * Purpose: Get the available resources on the client and add them to the available
  * resources string.
  * Input:
@@ -161,17 +119,17 @@ void getUserInput(char *userInput) {
  * - -1: Error
  * - 0: Success
  */
-int getAvailableResources(char *availableResources, const char *directoryName) {
-  DIR *directoryStream = opendir(directoryName);
+int getAvailableResources(char* availableResources, const char* directoryName) {
+  DIR* directoryStream = opendir(directoryName);
   if (directoryStream == NULL) {
     return -1;
     perror("Error opening resource directory");
   }
 
   // Loop through entire directory
-  struct dirent *directoryEntry;
+  struct dirent* directoryEntry;
   while ((directoryEntry = readdir(directoryStream)) != NULL) {
-    const char *entryName = directoryEntry->d_name;
+    const char* entryName = directoryEntry->d_name;
     // Ignore current directory
     if (strcmp(entryName, ".") == 0) {
       continue;
@@ -202,24 +160,21 @@ int sendConnectionPacket(struct sockaddr_in serverAddress, bool debugFlag) {
   strcpy(packetFields.type, "connection");
 
   // Username
-  char *username = calloc(1, MAX_USERNAME);
+  char* username = calloc(1, MAX_USERNAME);
   setUsername(username);
   strcpy(packetFields.data, username);
   strncat(packetFields.data, packetDelimiters.subfield, packetDelimiters.subfieldLength);
   free(username);
 
   // Available resources
-  char *availableResources = calloc(1, MAX_DATA);
+  char* availableResources = calloc(1, MAX_DATA);
   if (getAvailableResources(availableResources, "Public") == -1) {
     return -1;
   }
   strcat(packetFields.data, availableResources);
   free(availableResources);
 
-  char *returnPacket = calloc(1, MAX_PACKET);
-  buildPacket(returnPacket, packetFields, debugFlag);
-  sendUdpMessage(udpSocketDescriptor, serverAddress, returnPacket, debugFlag);
-  free(packet);
+  sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
 
   return 0;
 }
@@ -237,10 +192,48 @@ void sendResourcePacket(struct sockaddr_in serverAddress, bool debugFlag) {
   strcpy(packetFields.type, "resource");
   strcpy(packetFields.data, "dummyfield");
 
-  char *returnPacket = calloc(1, MAX_PACKET);
-  buildPacket(returnPacket, packetFields, debugFlag);
-  sendUdpMessage(udpSocketDescriptor, serverAddress, returnPacket, debugFlag);
-  free(returnPacket);
+  sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
+}
+
+/*
+ * Purpose: Take a packet of unknown type and call its corrosponding handler function
+ * Input:
+ * - Address of server that sent the packet
+ * - Debug flag
+ * Output: None
+ */
+void handlePacket(struct sockaddr_in serverAddress, bool debugFlag) {
+  struct PacketFields packetFields;
+  memset(&packetFields, 0, sizeof(packetFields));
+  readPacket(packet, &packetFields, debugFlag);
+
+  int packetType = getPacketType(packetFields.type, debugFlag);
+  switch (packetType) {
+  // Connection
+  case 0:
+    if (debugFlag) {
+      printf("Type of packet recieved is connection\n");
+    }
+    break;
+
+  // Status
+  case 1:
+    if (debugFlag) {
+      printf("Type of packet received is status\n");
+    }
+    handleStatusPacket(serverAddress, debugFlag);
+    break;
+
+  // Resource
+  case 2:
+    if (debugFlag) {
+      printf("Type of packet received is Resource\n");
+    }
+    handleResourcePacket(packetFields.data, debugFlag);
+    break;
+
+  default:
+  }
 }
 
 /*
@@ -250,9 +243,9 @@ void sendResourcePacket(struct sockaddr_in serverAddress, bool debugFlag) {
  * - Debug flag
  * Output: None
  */
-void handleResourcePacket(char *dataField, bool debugFlag) {
-  char *username         = calloc(1, MAX_USERNAME);
-  char *resourceSubfield = calloc(1, MAX_FILENAME);
+void handleResourcePacket(char* dataField, bool debugFlag) {
+  char* username         = calloc(1, MAX_USERNAME);
+  char* resourceSubfield = calloc(1, MAX_FILENAME);
 
   long unsigned int dataFieldLength = strlen(dataField);
   long unsigned int bytesRead       = 0;
@@ -303,10 +296,7 @@ void handleStatusPacket(struct sockaddr_in serverAddress, bool debugFlag) {
   strcpy(packetFields.type, "status");
   strcat(packetFields.data, "testing");
 
-  char *statusPacket = calloc(1, MAX_PACKET);
-  buildPacket(statusPacket, packetFields, debugFlag);
-  sendUdpMessage(udpSocketDescriptor, serverAddress, statusPacket, debugFlag);
-  free(statusPacket);
+  sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
 }
 
 /*
@@ -315,7 +305,7 @@ void handleStatusPacket(struct sockaddr_in serverAddress, bool debugFlag) {
  * Input: Username string to copy the user's username choice into
  * Output: None
  */
-void setUsername(char *username) {
+void setUsername(char* username) {
   printf("\nWhat username would you like to use?\n");
   printf("Press 0 for system username\n");
   printf("Press 1 for custom username\n");
@@ -323,7 +313,7 @@ void setUsername(char *username) {
   bool validUsername = false;
   while (validUsername == false) {
     validUsername   = true;
-    char *userInput = calloc(1, MAX_USER_INPUT);
+    char* userInput = calloc(1, MAX_USER_INPUT);
     getUserInput(userInput);
 
     // System
