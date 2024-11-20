@@ -289,3 +289,46 @@ int handleErrorNonBlocking(int returnValue) {
     return 0;
   }
 }
+
+/*
+ * Name: setupTcpSocket
+ * Purpose: Setup the TCP socket. Set it non blocking. Bind it. Set it to listen.
+ * Input: Address structure to bind to.
+ * Output: The setup TCP socket descriptor.
+ */
+int setupTcpSocket(struct sockaddr_in hostAddress) {
+  int tcpSocketDescriptor;
+
+  // Set up TCP socket
+  printf("Setting up TCP socket...\n");
+  tcpSocketDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+  if (tcpSocketDescriptor == -1) {
+    perror("Error when setting up TCP socket");
+    exit(1);
+  }
+
+  // Set non blocking
+  int fcntlReturn = fcntl(tcpSocketDescriptor, F_SETFL, O_NONBLOCK);
+  if (fcntlReturn == -1) {
+    perror("Error when setting TCP socket to non blocking");
+  }
+  printf("TCP socket set up\n");
+
+  // Bind TCP socket
+  printf("Binding TCP socket...\n");
+  int bindReturnTCP =
+      bind(tcpSocketDescriptor, (struct sockaddr*)&hostAddress, sizeof(hostAddress));
+  if (bindReturnTCP == -1) {
+    perror("Error when binding TCP socket");
+    exit(1);
+  }
+  printf("TCP socket bound\n");
+
+  // Set socket to listen
+  int listenReturn = listen(tcpSocketDescriptor, 10);
+  if (listenReturn == -1) {
+    perror("TCP socket listen error");
+    exit(1);
+  }
+  return tcpSocketDescriptor;
+}
