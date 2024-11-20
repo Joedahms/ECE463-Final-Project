@@ -141,6 +141,7 @@ char* makeResourceString(char* resourceString,
     strcat(resourceString, delimiter);
     strncat(resourceString, currentResource->filename, strlen(currentResource->filename));
     strcat(resourceString, delimiter);
+
     currentResource = currentResource->next;
   }
   return resourceString;
