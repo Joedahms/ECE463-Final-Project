@@ -18,6 +18,7 @@
 
 // Global so that signal handler can free resources
 int udpSocketDescriptor;
+int tcpSocketDescriptor;
 char* packet;
 
 // Packet delimiters that are constant for all packets
@@ -29,18 +30,31 @@ int main(int argc, char* argv[]) {
   // Assign callback function to handle ctrl-c
   signal(SIGINT, shutdownClient);
 
-  // Address of server
+  // Address of server (UDP)
   struct sockaddr_in serverAddress;
   memset(&serverAddress, 0, sizeof(serverAddress));
   serverAddress.sin_family      = AF_INET;
   serverAddress.sin_port        = htons(PORT);
   serverAddress.sin_addr.s_addr = INADDR_ANY;
 
-  // Local UDP
+  // Local UDP port
   struct sockaddr_in udpAddress;
   memset(&udpAddress, 0, sizeof(udpAddress));
   bool bindFlag       = false;
   udpSocketDescriptor = setupUdpSocket(udpAddress, bindFlag);
+
+  // Local TCP port
+  struct sockaddr_in tcpAddress;
+  memset(&tcpAddress, 0, sizeof(tcpAddress));
+  tcpAddress.sin_port = 0; // Wildcard
+  tcpSocketDescriptor = setupTcpSocket(tcpAddress);
+
+  /*
+  struct sockaddr_in test;
+  socklen_t testLen = sizeof(test);
+  getsockname(tcpSocketDescriptor, (struct sockaddr*)&test, &testLen);
+  printf("%d\n", ntohs(test.sin_port));
+  */
 
   bool debugFlag = false;
   checkCommandLineArguments(argc, argv, &debugFlag);
@@ -105,6 +119,7 @@ int main(int argc, char* argv[]) {
 void shutdownClient() {
   free(packet);
   close(udpSocketDescriptor);
+  close(tcpSocketDescriptor);
   printf("\n");
   exit(0);
 }

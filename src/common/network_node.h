@@ -47,4 +47,6 @@ int setupUdpSocket(struct sockaddr_in, bool);
 int checkUdpSocket(int, struct sockaddr_in*, char*, bool);
 int handleErrorNonBlocking(int);
 
+int setupTcpSocket(struct sockaddr_in);
+
 #endif
