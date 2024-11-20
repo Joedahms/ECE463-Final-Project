@@ -3,8 +3,8 @@
 
 // Microseconds
 #define STATUS_SEND_INTERVAL 3000000
-// Maximum number of clients that can be connected to the server
 
+// Maximum number of clients that can be connected to the server
 #define MAX_CONNECTED_CLIENTS 100
 
 #include <stdbool.h>
