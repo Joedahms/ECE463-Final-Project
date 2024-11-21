@@ -35,7 +35,6 @@
 #include <sys/types.h>
 
 void checkCommandLineArguments(int, char**, bool*);
-void getUserInput(char*);
 void sendUdpMessage(int, struct sockaddr_in, char*, bool);
 void printReceivedMessage(struct sockaddr_in, long int, char*, bool);
 

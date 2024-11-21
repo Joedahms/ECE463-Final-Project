@@ -46,16 +46,6 @@ void checkCommandLineArguments(int argc, char** argv, bool* debugFlag) {
 }
 
 /*
- * Purpose: Get user input from standard in and remove the newline
- * Input: String to store user input in
- * Output: None
- */
-void getUserInput(char* userInput) {
-  fgets(userInput, MAX_USER_INPUT, stdin);
-  userInput[strcspn(userInput, "\n")] = 0;
-}
-
-/*
  * Purpose: Send a message via UDP
  * Input:
  * - Socket to send the message out on

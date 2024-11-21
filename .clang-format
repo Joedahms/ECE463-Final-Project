@@ -9,6 +9,11 @@ AlignTrailingComments: true
 AlwaysBreakAfterReturnType: None
 PenaltyReturnTypeOnItsOwnLine: 1000
 BinPackParameters: false
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: false
+  AfterStruct: false
+  BeforeElse: true
 ColumnLimit: 90
 IndentCaseBlocks: true
 KeepEmptyLinesAtTheStartOfBlocks: false

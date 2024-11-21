@@ -78,16 +78,12 @@ int main(int argc, char* argv[]) {
     if (FD_ISSET(0, &read_fds)) {
       char* userInput = calloc(1, MAX_USER_INPUT);
       getUserInput(userInput);
+      int handleUserInputReturn = handleUserInput(userInput, serverAddress, debugFlag);
 
-      if (strcmp(userInput, "resources") == 0) {
-        sendResourcePacket(serverAddress, debugFlag);
-      }
-
-      // User just pressed return
-      if (strlen(userInput) == 0) {
-        free(userInput);
+      if (handleUserInputReturn == -1) {
         continue;
       }
+
       free(userInput);
     }
 
@@ -102,6 +98,49 @@ int main(int argc, char* argv[]) {
     }
     recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
     handlePacket(serverAddress, debugFlag);
+  }
+  return 0;
+}
+
+/*
+ * Purpose: Get user input from standard in and remove the newline
+ * Input: String to store user input in
+ * Output: None
+ */
+void getUserInput(char* userInput) {
+  fgets(userInput, MAX_USER_INPUT, stdin);
+  userInput[strcspn(userInput, "\n")] = 0;
+}
+
+/*
+ * Purpose: Decide what to do next depending on what the user entered
+ * Input:
+ * - The user's input
+ * - The socket address of the server
+ * - Debug flag
+ * Output:
+ * - -1: User just pressed return
+ * - 0: All went swimmingly
+ */
+int handleUserInput(char* userInput, struct sockaddr_in serverAddress, bool debugFlag) {
+  if (strcmp(userInput, "resources") == 0) {
+    sendResourcePacket(serverAddress, debugFlag);
+  }
+  else if (strncmp(userInput, "request", 7) == 0) {
+    userInput += 8;
+    sendTcpInfoPacket(serverAddress, userInput, debugFlag);
+  }
+  else {
+    printf("Invalid command, please try again\n");
+    printf("Valid commands:\n");
+    printf("resources: See what resources are available on the network\n");
+    printf("request:   Request a resource on the network by filename\n");
+  }
+
+  // User just pressed return
+  if (strlen(userInput) == 0) {
+    free(userInput);
+    return -1;
   }
   return 0;
 }
@@ -217,6 +256,15 @@ void sendResourcePacket(struct sockaddr_in serverAddress, bool debugFlag) {
   sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
 }
 
+void sendTcpInfoPacket(struct sockaddr_in serverAddress, char* fileName, bool debugFlag) {
+  struct PacketFields packetFields;
+  strcpy(packetFields.type, "tcpinfo");
+  strcpy(packetFields.data, fileName);
+
+  printf("%s\n", packetFields.data);
+  sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
+}
+
 /*
  * Purpose: Take a packet of unknown type and call its corrosponding handler function
  * Input:
@@ -288,7 +336,8 @@ void handleResourcePacket(char* dataField, bool debugFlag) {
       // Don't duplicate username printout
       if (strcmp(username, resourceSubfield) == 0) {
         ;
-      } else {
+      }
+      else {
         strcpy(username, resourceSubfield);
         printf("Username: %s\n", username);
       }
@@ -320,6 +369,8 @@ void handleStatusPacket(struct sockaddr_in serverAddress, bool debugFlag) {
 
   sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
 }
+
+void handleTcpInfoPacket() {}
 
 /*
  * Purpose: Ask the user what username they would like to use when connecting to the
