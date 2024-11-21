@@ -66,8 +66,8 @@ int main(int argc, char* argv[]) {
 
   // Continously listen for new UDP packets and new TCP connections
   while (1) {
-    struct sockaddr_in clientUDPAddress;
-    packetAvailable = checkUdpSocket(udpSocketDescriptor, &clientUDPAddress, packet,
+    struct sockaddr_in clientUdpAddress;
+    packetAvailable = checkUdpSocket(udpSocketDescriptor, &clientUdpAddress, packet,
                                      debugFlag); // Check the UDP socket
 
     if (!packetAvailable) {
@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
       if (debugFlag) {
         printf("Type of packet recieved is connection\n");
       }
-      handleConnectionPacket(packetFields.data, clientUDPAddress, debugFlag);
+      handleConnectionPacket(clientUdpAddress, packetFields.data, debugFlag);
       break;
 
     // Status packet
@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
       if (debugFlag) {
         printf("Type of packet received is status\n");
       }
-      handleStatusPacket(clientUDPAddress);
+      handleStatusPacket(clientUdpAddress);
       break;
 
     // Resource packet
@@ -104,7 +104,15 @@ int main(int argc, char* argv[]) {
       if (debugFlag) {
         printf("Type of packet received is Resource\n");
       }
-      handleResourcePacket(clientUDPAddress, debugFlag);
+      handleResourcePacket(clientUdpAddress, debugFlag);
+      break;
+
+    // TCP info packet
+    case 3:
+      if (debugFlag) {
+        printf("Type of packet received is tcpinfo\n");
+      }
+      handleTcpInfoPacket(clientUdpAddress, packetFields.data, debugFlag);
       break;
 
     default:
@@ -215,7 +223,8 @@ int findEmptyConnectedClient(bool debugFlag) {
       if (debugFlag) {
         printf("%d is empty\n", connectedClientsIndex);
       }
-    } else {
+    }
+    else {
       if (debugFlag) {
         printf("%d is not empty\n", connectedClientsIndex);
       }
@@ -300,15 +309,15 @@ void addResourcesToDirectory(char* dataField,
  * - The address of the client who sent the packet
  * Output: None
  */
-void handleConnectionPacket(char* packetData,
-                            struct sockaddr_in clientUDPAddress,
+void handleConnectionPacket(struct sockaddr_in clientUdpAddress,
+                            char* packetData,
                             bool debugFlag) {
   int emptyClientIndex                = findEmptyConnectedClient(debugFlag);
   struct ConnectedClient* emptyClient = &connectedClients[emptyClientIndex];
 
   // Connection info and status
-  emptyClient->socketUdpAddress.sin_addr.s_addr = clientUDPAddress.sin_addr.s_addr;
-  emptyClient->socketUdpAddress.sin_port        = clientUDPAddress.sin_port;
+  emptyClient->socketUdpAddress.sin_addr.s_addr = clientUdpAddress.sin_addr.s_addr;
+  emptyClient->socketUdpAddress.sin_port        = clientUdpAddress.sin_port;
   emptyClient->status                           = true;
 
   // Username
@@ -407,4 +416,36 @@ int handleResourcePacket(struct sockaddr_in clientUdpAddress, bool debugFlag) {
   free(returnPacket);
 
   return 0;
+}
+
+void handleTcpInfoPacket(struct sockaddr_in clientUdpAddress,
+                         char* packetData,
+                         bool debugFlag) {
+  struct PacketFields packetFields;
+  strcpy(packetFields.type, "tcpinfo");
+
+  char* username = calloc(1, MAX_USERNAME);
+  bool fileFound = searchResourcesByFilename(headResource, username, packetData);
+  if (fileFound) {
+    // send back tcp info
+    int i = 0;
+    for (i = 0; i < MAX_CONNECTED_CLIENTS; i++) {
+      if (strcmp(connectedClients[i].username, username) == 0) {
+        char address[64];
+        sprintf(address, "%d", connectedClients[i].socketTcpAddress.sin_addr.s_addr);
+        strcpy(packetFields.data, address);
+        strcat(packetFields.data, packetDelimiters.subfield);
+        char port[64];
+        sprintf(port, "%d", connectedClients[i].socketTcpAddress.sin_port);
+        strcat(packetFields.data, port);
+        strcat(packetFields.data, packetDelimiters.subfield);
+
+        sendUdpPacket(udpSocketDescriptor, clientUdpAddress, packetFields, debugFlag);
+      }
+    }
+  }
+  else {
+    strcpy(packetFields.data, "filenotfound");
+    sendUdpPacket(udpSocketDescriptor, clientUdpAddress, packetFields, debugFlag);
+  }
 }

@@ -18,5 +18,6 @@ struct Resource* addResource(struct Resource*, char*, char*);
 char* makeResourceString(char*, struct Resource*, char*);
 void printAllResources(struct Resource*);
 struct Resource* removeUserResources(char*, struct Resource*, bool);
+bool searchResourcesByFilename(struct Resource*, char*, char*);
 
 #endif

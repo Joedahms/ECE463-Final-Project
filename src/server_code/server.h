@@ -25,8 +25,11 @@ void shutdownServer();
 int findEmptyConnectedClient(bool);
 void printAllConnectedClients();
 void addResourcesToDirectory(char*, long unsigned int, char*, bool);
-void handleConnectionPacket(char*, struct sockaddr_in, bool);
+
+// Handle packets
+void handleConnectionPacket(struct sockaddr_in, char*, bool);
 void handleStatusPacket(struct sockaddr_in);
 int handleResourcePacket(struct sockaddr_in, bool);
+void handleTcpInfoPacket(struct sockaddr_in, char*, bool);
 
 #endif

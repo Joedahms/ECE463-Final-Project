@@ -261,7 +261,6 @@ void sendTcpInfoPacket(struct sockaddr_in serverAddress, char* fileName, bool de
   strcpy(packetFields.type, "tcpinfo");
   strcpy(packetFields.data, fileName);
 
-  printf("%s\n", packetFields.data);
   sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
 }
 

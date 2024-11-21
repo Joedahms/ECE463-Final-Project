@@ -2,7 +2,7 @@
 #define PACKET_H
 
 #define MAX_PACKET       220
-#define NUM_PACKET_TYPES 3
+#define NUM_PACKET_TYPES 4
 #define MAX_PACKET_TYPE  20
 #define MAX_DATA         200
 

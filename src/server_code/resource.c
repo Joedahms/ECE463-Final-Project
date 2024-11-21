@@ -194,7 +194,8 @@ struct Resource* removeUserResources(char* username,
       if (atHead) {
         headResource    = removeHeadResource(headResource, debugFlag);
         currentResource = headResource;
-      } else {
+      }
+      else {
         currentResource =
             removeNonHeadResource(previousResource, currentResource, &atEnd, debugFlag);
         if (atEnd) {
@@ -221,4 +222,18 @@ struct Resource* removeUserResources(char* username,
     printAllResources(headResource);
   }
   return headResource;
+}
+
+bool searchResourcesByFilename(struct Resource* headResource,
+                               char* username,
+                               char* filename) {
+  struct Resource* currentResource = headResource;
+  while (currentResource->next != NULL) {
+    if (strcmp(currentResource->filename, filename) == 0) {
+      strcpy(username, currentResource->username);
+      return true;
+    }
+    currentResource = currentResource->next;
+  }
+  return false;
 }

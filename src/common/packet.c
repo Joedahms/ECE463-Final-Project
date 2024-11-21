@@ -7,7 +7,8 @@
 
 #include "packet.h"
 
-static const char* packetTypes[NUM_PACKET_TYPES] = {"connection", "status", "resource"};
+static const char* packetTypes[NUM_PACKET_TYPES] = {"connection", "status", "resource",
+                                                    "tcpinfo"};
 
 struct PacketDelimiters packetDelimiters = {
     1,
