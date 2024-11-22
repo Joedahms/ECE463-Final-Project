@@ -193,6 +193,17 @@ int getAvailableResources(char* availableResources, const char* directoryName) {
   return 0;
 }
 
+void* sendFile(void*) {}
+
+void* receiveFile(void*) {}
+
+void sendFileReqPacket(struct sockaddr_in fileHost, char* filename, bool debugFlag) {
+  pthread processId;
+  pthread_create(&processId, NULL, receiveFile)
+}
+
+void handleFileReqPacket(char* packetData, bool debugFlag) {}
+
 /*
  * Purpose: Send a connection packet to the specified server.
  * Input:
@@ -301,6 +312,12 @@ void handlePacket(struct sockaddr_in serverAddress, bool debugFlag) {
     handleResourcePacket(packetFields.data, debugFlag);
     break;
 
+  case 3:
+    if (debugFlag) {
+      printf("Type of packet received is tcpinfo\n");
+    }
+    handleTcpInfoPacket(packetFields.data, debugFlag);
+
   default:
   }
 }
@@ -369,7 +386,36 @@ void handleStatusPacket(struct sockaddr_in serverAddress, bool debugFlag) {
   sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
 }
 
-void handleTcpInfoPacket() {}
+/*
+ * Purpose: When the client receives a tcpinfo packet, this function extracts
+ * the ip address and port of the client on the network who is hosting the file that the
+ * user requested
+ * Input:
+ * - Data field of the tcpinfo packet sent from the server
+ * - Debug flag
+ * Output: Socket address struct of the client hosting the file
+ */
+void handleTcpInfoPacket(char* dataField, bool debugFlag) {
+  struct sockaddr_in fileHostAddress;
+  memset(&fileHostAddress, 0, sizeof(fileHostAddress));
+  char* end;
+  char* tcpinfoSubfield = calloc(1, 64);
+
+  // Address
+  dataField    = readPacketSubfield(dataField, tcpinfoSubfield, debugFlag);
+  long address = strtol(tcpinfoSubfield, &end, 10);
+  fileHostAddress.sin_addr.s_addr = (unsigned int)address;
+
+  // Port
+  dataField                = readPacketSubfield(dataField, tcpinfoSubfield, debugFlag);
+  long port                = strtol(tcpinfoSubfield, &end, 10);
+  fileHostAddress.sin_port = (short unsigned int)port;
+
+  if (debugFlag) {
+    printf("file host address: %d\n", fileHostAddress.sin_addr.s_addr);
+    printf("file host port: %d\n", fileHostAddress.sin_port);
+  }
+}
 
 /*
  * Purpose: Ask the user what username they would like to use when connecting to the

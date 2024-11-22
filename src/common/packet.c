@@ -141,6 +141,9 @@ char* readPacketSubfield(char* field, char* subfield, bool debugFlag) {
   while (strncmp(field, packetDelimiters.subfield, packetDelimiters.subfieldLength) !=
          0) {
     strncat(subfield, field, 1);
+    if (debugFlag) {
+      printf("subfield: %s\n", subfield);
+    }
     field++;
   }
   field += packetDelimiters.subfieldLength;
