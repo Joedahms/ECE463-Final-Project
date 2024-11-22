@@ -2,6 +2,17 @@
 #define CLIENT_H
 
 #include <stdbool.h>
+#include <sys/socket.h>
+
+struct SendThreadInfo {
+  char filename[MAX_FILENAME];
+  struct sockaddr_in fileHost;
+};
+
+long int sendBytes(int, const char*, unsigned long int, uint8_t);
+long int receiveBytes(int, char*, long unsigned int, uint8_t);
+void putCommand(char*, bool);
+long int getCommand(char*, bool);
 
 void getUserInput(char*);
 int handleUserInput(char*, struct sockaddr_in, bool);

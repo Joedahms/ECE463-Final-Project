@@ -8,14 +8,12 @@ STEST = server_test_directory
 
 all: server client
 
-server: server.o network_node.o packet.o resource.o
-	gcc server.o network_node.o packet.o resource.o -o server
-	# mkdir -p server_test_directory
+server: server.o network_node.o packet.o resource.o tcp.o
+	gcc server.o network_node.o packet.o resource.o tcp.o -o server
 	mv server server_test_directory
 
 client: client.o network_node.o packet.o
 	gcc client.o network_node.o packet.o -o client
-	# mkdir -p client_test_directory
 	mv client client_test_directory
 
 client.o: $(CL)client.c $(CL)client.h
@@ -33,9 +31,10 @@ packet.o: $(CO)packet.c $(CO)packet.h
 resource.o: $(S)resource.c $(S)resource.h
 	gcc $(CFLAGS) $(S)resource.c
 
+tcp.o: $(CO)tcp.c $(CO)tcp.h
+	gcc $(CFLAGS) $(CO)tcp.c
+
 clean:
-	#rm -rf $(CLTEST)
 	rm $(CLTEST)/client	# Only removing the executable
-	#rm -rf $(STEST)
 	rm $(STEST)/server
 	rm *.o

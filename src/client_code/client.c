@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -193,16 +194,181 @@ int getAvailableResources(char* availableResources, const char* directoryName) {
   return 0;
 }
 
-void* sendFile(void*) {}
-
 void* receiveFile(void*) {}
 
-void sendFileReqPacket(struct sockaddr_in fileHost, char* filename, bool debugFlag) {
-  pthread processId;
-  pthread_create(&processId, NULL, receiveFile)
+void* sendFile(void*) {}
+
+/*
+ * Name: sendBytes
+ * Purpose: Send a desired number of bytes out on a Socket
+ * Input:
+ * - Socket Descriptor of the socket to send the bytes with
+ * - Buffer containing the bytes to send
+ * - Amount of bytes to send
+ * - Debug flag
+ * Output: Number of bytes sent
+ */
+long int sendBytes(int socketDescriptor,
+                   const char* buffer,
+                   unsigned long int bufferSize,
+                   uint8_t debugFlag) {
+  if (debugFlag) {
+    printf("Bytes to be sent:\n\n");
+    unsigned long int i;
+    for (i = 0; i < bufferSize; i++) {
+      printf("%c", buffer[i]);
+    }
+    printf("\n\n");
+  }
+
+  long int bytesSent = 0;
+  bytesSent          = send(socketDescriptor, buffer, bufferSize, 0);
+  if (bytesSent == -1) {
+    char* errorMessage = malloc(1024);
+    strcpy(errorMessage, strerror(errno));
+    printf("Byte send failed with error %s\n", errorMessage);
+    exit(1);
+  }
+  else {
+    return bytesSent;
+  }
 }
 
-void handleFileReqPacket(char* packetData, bool debugFlag) {}
+/*
+ * Name: receiveBytes
+ * Purpose: This function is for receiving a set number of bytes into
+ * a buffer
+ * Input:
+ * - Socket Descriptor of the accepted transmission
+ * - Buffer to put the received data into
+ * - The size of the message to receive in bytes
+ * Output:
+ * - The number of bytes received into the buffer
+ */
+long int receiveBytes(int incomingSocketDescriptor,
+                      char* buffer,
+                      long unsigned int bufferSize,
+                      uint8_t debugFlag) {
+  long int numberOfBytesReceived = 0;
+  numberOfBytesReceived          = recv(incomingSocketDescriptor, buffer, bufferSize, 0);
+  if (debugFlag) {
+    // Print out incoming message
+    int i;
+    printf("Bytes received: \n");
+    for (i = 0; i < numberOfBytesReceived; i++) {
+      printf("%c", buffer[i]);
+    }
+    printf("\n");
+  }
+  return numberOfBytesReceived;
+}
+
+/*
+ * Name: putCommand
+ * Purpose: Send a file to the server
+ * Input: Name of the file to send
+ * Output: None
+ */
+void putCommand(char* fileName, bool debugFlag) {
+  char* fileContents = malloc(MAX_FILE_SIZE);
+  int readFileReturn = readFile(fileName, fileContents, debugFlag);
+  if (readFileReturn == -1) {
+    printf("Put command error when reading file");
+  }
+  sendBytes(tcpSocketDescriptor, fileContents, strlen(fileContents), debugFlag);
+}
+
+/*
+ * Name: getCommand
+ * Purpose: Receive file from server and write it into local directory
+ * Input: File name of requested file
+ * Output:
+ * - -1: failure
+ * - 0: Success
+ */
+long int getCommand(char* fileName, bool debugFlag) {
+  printf("Receiving file...\n");
+  char* incomingFileContents = malloc(MAX_FILE_SIZE); // Space for file contents
+  long int numberOfBytesReceived;                     // How many bytes received
+  numberOfBytesReceived =
+      recv(tcpSocketDescriptor, incomingFileContents, MAX_FILE_SIZE, 0);
+
+  int writeFileReturn =
+      writeFile(fileName, incomingFileContents, (long unsigned int)numberOfBytesReceived);
+  if (writeFileReturn == -1) {
+    return -1;
+  }
+
+  if (debugFlag) {
+    printf("Received file is %ld bytes\n", numberOfBytesReceived);
+    printf("Contents of received file:\n%s\n", incomingFileContents);
+  }
+  else {
+    printf("Received file\n");
+  }
+  return 0;
+}
+
+void sendFileReqPacket(struct sockaddr_in fileHost, char* filename, bool debugFlag) {
+  // Start thread to receive file
+  pthread_t processId;
+  pthread_create(&processId, NULL, receiveFile, &debugFlag);
+
+  // Requesting client
+  struct sockaddr_in tcpSocketInfo;
+  socklen_t tcpSocketInfoSize = sizeof(tcpSocketInfo);
+  getsockname(tcpSocketDescriptor, (struct sockaddr*)&tcpSocketInfo, &tcpSocketInfoSize);
+
+  // Request file from file host
+  struct PacketFields packetFields;
+  // Packet type
+  strcpy(packetFields.type, "filereq");
+  strcat(packetFields.data, packetDelimiters.subfield);
+
+  // Filename
+  strcat(packetFields.data, filename);
+  strcat(packetFields.data, packetDelimiters.subfield);
+
+  // Ip address of requesting client
+  char address[64];
+  sprintf(address, "%d", tcpSocketInfo.sin_addr.s_addr);
+  strcat(packetFields.data, address);
+  strcat(packetFields.data, packetDelimiters.subfield);
+
+  // Port of requesting client
+  char port[64];
+  sprintf(port, "%d", tcpSocketInfo.sin_port);
+  strcat(packetFields.data, port);
+  strcat(packetFields.data, packetDelimiters.subfield);
+
+  sendUdpPacket(udpSocketDescriptor, fileHost, packetFields, debugFlag);
+}
+
+void handleFileReqPacket(char* dataField, bool debugFlag) {
+  // Determine filename to send
+  char* filename = calloc(1, MAX_FILENAME);
+  dataField      = readPacketSubfield(dataField, filename, debugFlag);
+
+  struct SendThreadInfo sendThreadInfo;
+  strcpy(sendThreadInfo.filename, filename);
+
+  char* end;
+  char* requesterTcpInfo = calloc(1, 64);
+
+  dataField    = readPacketSubfield(dataField, requesterTcpInfo, debugFlag);
+  long address = strtol(requesterTcpInfo, &end, 10);
+  sendThreadInfo.fileHost.sin_addr.s_addr = (unsigned int)address;
+
+  dataField = readPacketSubfield(dataField, requesterTcpInfo, debugFlag);
+  long port = strtol(requesterTcpInfo, &end, 10);
+  sendThreadInfo.fileHost.sin_port = (short unsigned int)port;
+
+  free(filename);
+
+  // Send file
+  pthread_t processId;
+  pthread_create(&processId, NULL, sendFile, &sendThreadInfo);
+}
 
 /*
  * Purpose: Send a connection packet to the specified server.
