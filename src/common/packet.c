@@ -8,9 +8,8 @@
 #include "packet.h"
 
 static const char* packetTypes[NUM_PACKET_TYPES] = {"connection", "status", "resource",
-                                                    "tcpinfo"};
-
-struct PacketDelimiters packetDelimiters = {
+                                                    "tcpinfo", "filereq"};
+struct PacketDelimiters packetDelimiters         = {
     1,
     "$", // field
     1,
