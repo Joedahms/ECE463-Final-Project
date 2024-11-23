@@ -244,33 +244,40 @@ void handleTcpInfoPacket(int tcpSocketDescriptor,
                          int udpSocketDescriptor,
                          char* dataField,
                          bool debugFlag) {
-  struct sockaddr_in fileHostAddress;
-  memset(&fileHostAddress, 0, sizeof(fileHostAddress));
+  struct sockaddr_in fileHostUdpAddress;
+  memset(&fileHostUdpAddress, 0, sizeof(fileHostUdpAddress));
+
   char* end;
-  char* tcpinfoSubfield = calloc(1, 64);
+  char subfield[64];
 
   // Filename
   char* filename = calloc(1, MAX_FILENAME);
   dataField      = readPacketSubfield(dataField, filename, debugFlag);
 
-  // TCP address
-  dataField    = readPacketSubfield(dataField, tcpinfoSubfield, debugFlag);
-  long address = strtol(tcpinfoSubfield, &end, 10);
-  fileHostAddress.sin_addr.s_addr = (unsigned int)address;
+  // UDP address
+  dataField                          = readPacketSubfield(dataField, subfield, debugFlag);
+  long address                       = strtol(subfield, &end, 10);
+  fileHostUdpAddress.sin_addr.s_addr = (unsigned int)address;
 
-  // TCP port
-  dataField                = readPacketSubfield(dataField, tcpinfoSubfield, debugFlag);
-  long port                = strtol(tcpinfoSubfield, &end, 10);
-  fileHostAddress.sin_port = (short unsigned int)port;
+  char* end2;
+  char subfield2[64];
+  memset(subfield2, 0, sizeof(subfield2));
+
+  // UDP port
+  dataField                   = readPacketSubfield(dataField, subfield2, debugFlag);
+  long port                   = strtol(subfield2, &end2, 10);
+  fileHostUdpAddress.sin_port = (short unsigned int)port;
 
   if (debugFlag) {
-    printf("file host address: %d\n", fileHostAddress.sin_addr.s_addr);
-    printf("file host port: %d\n", fileHostAddress.sin_port);
+    printf("file host UDP address: %d\n", fileHostUdpAddress.sin_addr.s_addr);
+    printf("file host UDP port: %d\n", fileHostUdpAddress.sin_port);
   }
 
-  sendFileReqPacket(tcpSocketDescriptor, udpSocketDescriptor, fileHostAddress, filename,
-                    debugFlag);
+  sendFileReqPacket(tcpSocketDescriptor, udpSocketDescriptor, fileHostUdpAddress,
+                    filename, debugFlag);
 }
+
+// request test01.txt
 
 /*
  * Purpose: Send a file request packet to another client. This indicates that the sending
@@ -285,7 +292,7 @@ void handleTcpInfoPacket(int tcpSocketDescriptor,
  */
 void sendFileReqPacket(int tcpSocketDescriptor,
                        int udpSocketDescriptor,
-                       struct sockaddr_in fileHost,
+                       struct sockaddr_in fileHostUdpAddress,
                        char* filename,
                        bool debugFlag) {
   // Start thread to receive file
@@ -296,7 +303,7 @@ void sendFileReqPacket(int tcpSocketDescriptor,
   pthread_t processId;
   pthread_create(&processId, NULL, receiveFile, &receiveThreadInfo);
 
-  // Requesting client
+  // Requesting client socket address
   struct sockaddr_in tcpSocketInfo;
   socklen_t tcpSocketInfoSize = sizeof(tcpSocketInfo);
   getsockname(tcpSocketDescriptor, (struct sockaddr*)&tcpSocketInfo, &tcpSocketInfoSize);
@@ -305,10 +312,9 @@ void sendFileReqPacket(int tcpSocketDescriptor,
   struct PacketFields packetFields;
   // Packet type
   strcpy(packetFields.type, "filereq");
-  strcat(packetFields.data, packetDelimiters.subfield);
 
   // Filename
-  strcat(packetFields.data, filename);
+  strcpy(packetFields.data, filename);
   strcat(packetFields.data, packetDelimiters.subfield);
 
   // Ip address of requesting client
@@ -323,7 +329,7 @@ void sendFileReqPacket(int tcpSocketDescriptor,
   strcat(packetFields.data, port);
   strcat(packetFields.data, packetDelimiters.subfield);
 
-  sendUdpPacket(udpSocketDescriptor, fileHost, packetFields, debugFlag);
+  sendUdpPacket(udpSocketDescriptor, fileHostUdpAddress, packetFields, debugFlag);
 }
 
 /*

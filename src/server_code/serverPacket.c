@@ -11,6 +11,18 @@
 // packet.h
 extern struct PacketDelimiters packetDelimiters;
 
+/*
+ * Purpose: When the server recieves a packet, this function determines what to do with
+ * it.
+ * Input:
+ * - The packet to handle
+ * - UDP socket descriptor on the server
+ * - UDP address structure of client who sent the packet
+ * - Clients connected to the server
+ * - Available resources in the network
+ * - Debug flag
+ * Output: None
+ */
 void handlePacket(char* packet,
                   int udpSocketDescriptor,
                   struct sockaddr_in clientUdpAddress,
@@ -190,6 +202,21 @@ int handleResourcePacket(int udpSocketDescriptor,
   return 0;
 }
 
+/*
+ * Purpose: When the server recieves a tcpinfo packet, this function is called. If a
+ * tcpinfo packet is received by the server it means a client is looking for a file in the
+ * network. Find the client that is hosting the file. Send back the filename along with
+ * socket address structures containing info about the TCP and UDP socket open on the
+ * hosting client.
+ * Input:
+ * - UDP socket descriptor on the server
+ * - UDP socket address of the client who sent the tcpinfo packet
+ * - Clients connected to the server
+ * - Resources available in the network
+ * - Data field of the received tcpinfo packet
+ * - Debug flag
+ * Output: None
+ */
 void handleTcpInfoPacket(int udpSocketDescriptor,
                          struct sockaddr_in clientUdpAddress,
                          struct ConnectedClient* connectedClients,
@@ -210,18 +237,19 @@ void handleTcpInfoPacket(int udpSocketDescriptor,
         strcat(packetFields.data, packetData);
         strcat(packetFields.data, packetDelimiters.subfield);
 
-        // TCP Address
+        // UDP address
         char address[64];
-        sprintf(address, "%d", connectedClients[i].socketTcpAddress.sin_addr.s_addr);
-        strcpy(packetFields.data, address);
+        sprintf(address, "%d", connectedClients[i].socketUdpAddress.sin_addr.s_addr);
+        strcat(packetFields.data, address);
         strcat(packetFields.data, packetDelimiters.subfield);
 
-        // TCP Port
+        // UDP port
         char port[64];
-        sprintf(port, "%d", connectedClients[i].socketTcpAddress.sin_port);
+        sprintf(port, "%d", connectedClients[i].socketUdpAddress.sin_port);
         strcat(packetFields.data, port);
         strcat(packetFields.data, packetDelimiters.subfield);
 
+        printf("packet data: %s\n", packetFields.data);
         sendUdpPacket(udpSocketDescriptor, clientUdpAddress, packetFields, debugFlag);
       }
     }
