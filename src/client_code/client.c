@@ -100,7 +100,8 @@ int main(int argc, char* argv[]) {
       printf("Packet received\n");
     }
     recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
-    handlePacket(packet, udpSocketDescriptor, serverAddress, debugFlag);
+    handlePacket(packet, tcpSocketDescriptor, udpSocketDescriptor, serverAddress,
+                 debugFlag);
   }
   return 0;
 }

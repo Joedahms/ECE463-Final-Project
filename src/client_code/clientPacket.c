@@ -22,6 +22,7 @@ extern struct PacketDelimiters packetDelimiters;
  * Output: None
  */
 void handlePacket(char* packet,
+                  int tcpSocketDescriptor,
                   int udpSocketDescriptor,
                   struct sockaddr_in serverAddress,
                   bool debugFlag) {
@@ -58,7 +59,8 @@ void handlePacket(char* packet,
     if (debugFlag) {
       printf("Type of packet received is tcpinfo\n");
     }
-    handleTcpInfoPacket(packetFields.data, debugFlag);
+    handleTcpInfoPacket(tcpSocketDescriptor, udpSocketDescriptor, packetFields.data,
+                        debugFlag);
     break;
 
   case 4:
@@ -238,18 +240,25 @@ void sendTcpInfoPacket(int udpSocketDescriptor,
  * - Debug flag
  * Output: Socket address struct of the client hosting the file
  */
-void handleTcpInfoPacket(char* dataField, bool debugFlag) {
+void handleTcpInfoPacket(int tcpSocketDescriptor,
+                         int udpSocketDescriptor,
+                         char* dataField,
+                         bool debugFlag) {
   struct sockaddr_in fileHostAddress;
   memset(&fileHostAddress, 0, sizeof(fileHostAddress));
   char* end;
   char* tcpinfoSubfield = calloc(1, 64);
 
-  // Address
+  // Filename
+  char* filename = calloc(1, MAX_FILENAME);
+  dataField      = readPacketSubfield(dataField, filename, debugFlag);
+
+  // TCP address
   dataField    = readPacketSubfield(dataField, tcpinfoSubfield, debugFlag);
   long address = strtol(tcpinfoSubfield, &end, 10);
   fileHostAddress.sin_addr.s_addr = (unsigned int)address;
 
-  // Port
+  // TCP port
   dataField                = readPacketSubfield(dataField, tcpinfoSubfield, debugFlag);
   long port                = strtol(tcpinfoSubfield, &end, 10);
   fileHostAddress.sin_port = (short unsigned int)port;
@@ -259,7 +268,8 @@ void handleTcpInfoPacket(char* dataField, bool debugFlag) {
     printf("file host port: %d\n", fileHostAddress.sin_port);
   }
 
-  // sendFileReqPacket(fileHostAddress, )
+  sendFileReqPacket(tcpSocketDescriptor, udpSocketDescriptor, fileHostAddress, filename,
+                    debugFlag);
 }
 
 /*

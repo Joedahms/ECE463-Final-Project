@@ -8,8 +8,8 @@ STEST = server_test_directory
 
 all: server client
 
-server: server.o network_node.o packet.o resource.o
-	gcc server.o network_node.o packet.o resource.o -o server
+server: server.o network_node.o packet.o resource.o serverPacket.o
+	gcc server.o network_node.o packet.o resource.o serverPacket.o -o server
 	mv server server_test_directory
 
 client: client.o network_node.o packet.o tcp.o clientPacket.o
@@ -37,6 +37,9 @@ tcp.o: $(CO)tcp.c $(CO)tcp.h
 
 clientPacket.o: $(CL)clientPacket.c $(CL)clientPacket.h
 	gcc $(CFLAGS) $(CL)clientPacket.c
+
+serverPacket.o: $(S)serverPacket.c $(S)serverPacket.h
+	gcc $(CFLAGS) $(S)serverPacket.c
 
 clean:
 	rm client_test_directory01/client
