@@ -15,7 +15,9 @@
 
 #include "../common/network_node.h"
 #include "../common/packet.h"
+#include "../common/tcp.h"
 #include "client.h"
+#include "clientPacket.h"
 
 // Global so that signal handler can free resources
 int udpSocketDescriptor;
@@ -125,7 +127,7 @@ void getUserInput(char* userInput) {
  */
 int handleUserInput(char* userInput, struct sockaddr_in serverAddress, bool debugFlag) {
   if (strcmp(userInput, "resources") == 0) {
-    sendResourcePacket(serverAddress, debugFlag);
+    sendResourcePacket(udpSocketDescriptor, serverAddress, debugFlag);
   }
   else if (strncmp(userInput, "request", 7) == 0) {
     userInput += 8;
@@ -194,125 +196,25 @@ int getAvailableResources(char* availableResources, const char* directoryName) {
   return 0;
 }
 
-void* receiveFile(void*) {}
+void* receiveFile(void* input) {
+  struct ReceiveThreadInfo* receiveThreadInfo;
+  receiveThreadInfo = (struct ReceiveThreadInfo*)input;
 
-void* sendFile(void*) {}
-
-/*
- * Name: sendBytes
- * Purpose: Send a desired number of bytes out on a Socket
- * Input:
- * - Socket Descriptor of the socket to send the bytes with
- * - Buffer containing the bytes to send
- * - Amount of bytes to send
- * - Debug flag
- * Output: Number of bytes sent
- */
-long int sendBytes(int socketDescriptor,
-                   const char* buffer,
-                   unsigned long int bufferSize,
-                   uint8_t debugFlag) {
-  if (debugFlag) {
-    printf("Bytes to be sent:\n\n");
-    unsigned long int i;
-    for (i = 0; i < bufferSize; i++) {
-      printf("%c", buffer[i]);
-    }
-    printf("\n\n");
-  }
-
-  long int bytesSent = 0;
-  bytesSent          = send(socketDescriptor, buffer, bufferSize, 0);
-  if (bytesSent == -1) {
-    char* errorMessage = malloc(1024);
-    strcpy(errorMessage, strerror(errno));
-    printf("Byte send failed with error %s\n", errorMessage);
-    exit(1);
-  }
-  else {
-    return bytesSent;
-  }
+  tcpReceiveFile(receiveThreadInfo->socketDescriptor, receiveThreadInfo->filename,
+                 receiveThreadInfo->debugFlag);
+  return NULL;
 }
 
-/*
- * Name: receiveBytes
- * Purpose: This function is for receiving a set number of bytes into
- * a buffer
- * Input:
- * - Socket Descriptor of the accepted transmission
- * - Buffer to put the received data into
- * - The size of the message to receive in bytes
- * Output:
- * - The number of bytes received into the buffer
- */
-long int receiveBytes(int incomingSocketDescriptor,
-                      char* buffer,
-                      long unsigned int bufferSize,
-                      uint8_t debugFlag) {
-  long int numberOfBytesReceived = 0;
-  numberOfBytesReceived          = recv(incomingSocketDescriptor, buffer, bufferSize, 0);
-  if (debugFlag) {
-    // Print out incoming message
-    int i;
-    printf("Bytes received: \n");
-    for (i = 0; i < numberOfBytesReceived; i++) {
-      printf("%c", buffer[i]);
-    }
-    printf("\n");
-  }
-  return numberOfBytesReceived;
-}
-
-/*
- * Name: putCommand
- * Purpose: Send a file to the server
- * Input: Name of the file to send
- * Output: None
- */
-void putCommand(char* fileName, bool debugFlag) {
-  char* fileContents = malloc(MAX_FILE_SIZE);
-  int readFileReturn = readFile(fileName, fileContents, debugFlag);
-  if (readFileReturn == -1) {
-    printf("Put command error when reading file");
-  }
-  sendBytes(tcpSocketDescriptor, fileContents, strlen(fileContents), debugFlag);
-}
-
-/*
- * Name: getCommand
- * Purpose: Receive file from server and write it into local directory
- * Input: File name of requested file
- * Output:
- * - -1: failure
- * - 0: Success
- */
-long int getCommand(char* fileName, bool debugFlag) {
-  printf("Receiving file...\n");
-  char* incomingFileContents = malloc(MAX_FILE_SIZE); // Space for file contents
-  long int numberOfBytesReceived;                     // How many bytes received
-  numberOfBytesReceived =
-      recv(tcpSocketDescriptor, incomingFileContents, MAX_FILE_SIZE, 0);
-
-  int writeFileReturn =
-      writeFile(fileName, incomingFileContents, (long unsigned int)numberOfBytesReceived);
-  if (writeFileReturn == -1) {
-    return -1;
-  }
-
-  if (debugFlag) {
-    printf("Received file is %ld bytes\n", numberOfBytesReceived);
-    printf("Contents of received file:\n%s\n", incomingFileContents);
-  }
-  else {
-    printf("Received file\n");
-  }
-  return 0;
-}
+void* sendFile(void*) { return NULL; }
 
 void sendFileReqPacket(struct sockaddr_in fileHost, char* filename, bool debugFlag) {
   // Start thread to receive file
+  struct ReceiveThreadInfo receiveThreadInfo;
+  receiveThreadInfo.socketDescriptor = tcpSocketDescriptor;
+  strcpy(receiveThreadInfo.filename, filename);
+  receiveThreadInfo.debugFlag = debugFlag;
   pthread_t processId;
-  pthread_create(&processId, NULL, receiveFile, &debugFlag);
+  pthread_create(&processId, NULL, receiveFile, &receiveThreadInfo);
 
   // Requesting client
   struct sockaddr_in tcpSocketInfo;
@@ -417,22 +319,6 @@ int sendConnectionPacket(struct sockaddr_in hostTcpAddress,
   return 0;
 }
 
-/*
- * Purpose: Send a resource packet to the server. This indicates that the client would
- * like to know all of the available resources on the network.
- * Input:
- * - Address of server to send the packet to
- * - Debug flag
- * Output: None
- */
-void sendResourcePacket(struct sockaddr_in serverAddress, bool debugFlag) {
-  struct PacketFields packetFields;
-  strcpy(packetFields.type, "resource");
-  strcpy(packetFields.data, "dummyfield");
-
-  sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
-}
-
 void sendTcpInfoPacket(struct sockaddr_in serverAddress, char* fileName, bool debugFlag) {
   struct PacketFields packetFields;
   strcpy(packetFields.type, "tcpinfo");
@@ -483,56 +369,16 @@ void handlePacket(struct sockaddr_in serverAddress, bool debugFlag) {
       printf("Type of packet received is tcpinfo\n");
     }
     handleTcpInfoPacket(packetFields.data, debugFlag);
+    break;
+
+  case 4:
+    if (debugFlag) {
+      printf("Type of packet recieved is filereq\n");
+    }
+    handleFileReqPacket(packetFields.data, debugFlag);
 
   default:
   }
-}
-
-/*
- * Purpose: Print out all available resources in a sent resource packet
- * Input:
- * - Data field of the sent resource packet
- * - Debug flag
- * Output: None
- */
-void handleResourcePacket(char* dataField, bool debugFlag) {
-  char* username         = calloc(1, MAX_USERNAME);
-  char* resourceSubfield = calloc(1, MAX_FILENAME);
-
-  long unsigned int dataFieldLength = strlen(dataField);
-  long unsigned int bytesRead       = 0;
-  int fieldCount                    = 0;
-  while (bytesRead != dataFieldLength) {
-    memset(resourceSubfield, 0, strlen(resourceSubfield));
-    dataField = readPacketSubfield(dataField, resourceSubfield, debugFlag);
-    bytesRead += strlen(resourceSubfield) + packetDelimiters.subfieldLength;
-
-    // First field
-    if (fieldCount == 0) {
-      strcpy(username, resourceSubfield);
-      printf("Username: %s\n", username);
-    }
-
-    // Username
-    if (fieldCount % 2 == 0) {
-      // Don't duplicate username printout
-      if (strcmp(username, resourceSubfield) == 0) {
-        ;
-      }
-      else {
-        strcpy(username, resourceSubfield);
-        printf("Username: %s\n", username);
-      }
-    }
-    // Filename
-    else {
-      printf("Filename: %s\n", resourceSubfield);
-    }
-    fieldCount++;
-  }
-
-  free(username);
-  free(resourceSubfield);
 }
 
 /*
@@ -581,6 +427,8 @@ void handleTcpInfoPacket(char* dataField, bool debugFlag) {
     printf("file host address: %d\n", fileHostAddress.sin_addr.s_addr);
     printf("file host port: %d\n", fileHostAddress.sin_port);
   }
+
+  // sendFileReqPacket(fileHostAddress, )
 }
 
 /*
