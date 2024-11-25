@@ -4,9 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "../common/network_node.h"
 #include "../common/packet.h"
+#include "../common/tcp.h"
 #include "client.h"
 #include "clientPacket.h"
 
@@ -59,8 +62,8 @@ void handlePacket(char* packet,
     if (debugFlag) {
       printf("Type of packet received is tcpinfo\n");
     }
-    handleTcpInfoPacket(tcpSocketDescriptor, udpSocketDescriptor, packetFields.data,
-                        debugFlag);
+    handleClientInfoPacket(tcpSocketDescriptor, udpSocketDescriptor, packetFields.data,
+                           debugFlag);
     break;
 
   case 4:
@@ -220,10 +223,10 @@ void handleStatusPacket(int udpSocketDescriptor,
  * - Debug flag
  * Output: None
  */
-void sendTcpInfoPacket(int udpSocketDescriptor,
-                       struct sockaddr_in serverAddress,
-                       char* fileName,
-                       bool debugFlag) {
+void sendClientInfoPacket(int udpSocketDescriptor,
+                          struct sockaddr_in serverAddress,
+                          char* fileName,
+                          bool debugFlag) {
   struct PacketFields packetFields;
   strcpy(packetFields.type, "tcpinfo");
   strcpy(packetFields.data, fileName);
@@ -240,41 +243,76 @@ void sendTcpInfoPacket(int udpSocketDescriptor,
  * - Debug flag
  * Output: Socket address struct of the client hosting the file
  */
-void handleTcpInfoPacket(int tcpSocketDescriptor,
-                         int udpSocketDescriptor,
-                         char* dataField,
-                         bool debugFlag) {
+void handleClientInfoPacket(int tcpSocketDescriptor,
+                            int udpSocketDescriptor,
+                            char* dataField,
+                            bool debugFlag) {
+  struct sockaddr_in fileHostTcpAddress;
+  memset(&fileHostTcpAddress, 0, sizeof(fileHostTcpAddress));
   struct sockaddr_in fileHostUdpAddress;
   memset(&fileHostUdpAddress, 0, sizeof(fileHostUdpAddress));
 
   char* end;
   char subfield[64];
+  memset(subfield, 0, sizeof(subfield));
 
   // Filename
   char* filename = calloc(1, MAX_FILENAME);
   dataField      = readPacketSubfield(dataField, filename, debugFlag);
 
-  // UDP address
+  // TCP address
   dataField                          = readPacketSubfield(dataField, subfield, debugFlag);
-  long address                       = strtol(subfield, &end, 10);
-  fileHostUdpAddress.sin_addr.s_addr = (unsigned int)address;
+  long tcpAddress                    = strtol(subfield, &end, 10);
+  fileHostTcpAddress.sin_addr.s_addr = (unsigned int)tcpAddress;
 
   char* end2;
   char subfield2[64];
   memset(subfield2, 0, sizeof(subfield2));
 
-  // UDP port
+  // TCP port
   dataField                   = readPacketSubfield(dataField, subfield2, debugFlag);
-  long port                   = strtol(subfield2, &end2, 10);
-  fileHostUdpAddress.sin_port = (short unsigned int)port;
+  long tcpPort                = strtol(subfield2, &end2, 10);
+  fileHostTcpAddress.sin_port = (short unsigned int)tcpPort;
+
+  char* end3;
+  char subfield3[64];
+  memset(subfield3, 0, sizeof(subfield3));
+
+  // UDP address
+  dataField       = readPacketSubfield(dataField, subfield3, debugFlag);
+  long udpAddress = strtol(subfield3, &end3, 10);
+  fileHostUdpAddress.sin_addr.s_addr = (unsigned int)udpAddress;
+
+  char* end4;
+  char subfield4[64];
+  memset(subfield4, 0, sizeof(subfield4));
+
+  // UDP port
+  dataField                   = readPacketSubfield(dataField, subfield4, debugFlag);
+  long udpPort                = strtol(subfield4, &end4, 10);
+  fileHostUdpAddress.sin_port = (short unsigned int)udpPort;
 
   if (debugFlag) {
     printf("file host UDP address: %d\n", fileHostUdpAddress.sin_addr.s_addr);
     printf("file host UDP port: %d\n", fileHostUdpAddress.sin_port);
   }
 
-  sendFileReqPacket(tcpSocketDescriptor, udpSocketDescriptor, fileHostUdpAddress,
-                    filename, debugFlag);
+  // Fork a new process for the client
+  pid_t processId;
+  if ((processId = fork()) == -1) { // Fork error
+    perror("Error when forking a process for a new client");
+  }
+  else if (processId == 0) { // Child process
+    tcpSocketDescriptor =
+        tcpConnect("client", tcpSocketDescriptor, (struct sockaddr*)&fileHostTcpAddress,
+                   sizeof(fileHostTcpAddress));
+    sendFileReqPacket(tcpSocketDescriptor, udpSocketDescriptor, fileHostUdpAddress,
+                      filename, debugFlag);
+    tcpReceiveFile(tcpSocketDescriptor, filename, debugFlag);
+    exit(0);
+  }
+  else { // Parent process
+  }
 }
 
 // request test01.txt
@@ -295,14 +333,6 @@ void sendFileReqPacket(int tcpSocketDescriptor,
                        struct sockaddr_in fileHostUdpAddress,
                        char* filename,
                        bool debugFlag) {
-  // Start thread to receive file
-  struct ReceiveFileThreadInfo receiveFileThreadInfo;
-  receiveFileThreadInfo.socketDescriptor = tcpSocketDescriptor;
-  strcpy(receiveFileThreadInfo.filename, filename);
-  receiveFileThreadInfo.debugFlag = debugFlag;
-  pthread_t processId;
-  pthread_create(&processId, NULL, receiveFile, &receiveFileThreadInfo);
-
   // Requesting client socket address
   struct sockaddr_in tcpSocketInfo;
   socklen_t tcpSocketInfoSize = sizeof(tcpSocketInfo);
@@ -342,15 +372,14 @@ void sendFileReqPacket(int tcpSocketDescriptor,
  * Output: None
  */
 void handleFileReqPacket(int socketDescriptor, char* dataField, bool debugFlag) {
+  printf("%d", socketDescriptor);
+  printf("%s", dataField);
+  if (debugFlag) {
+  }
+  /*
   // Determine filename to send
   char* filename = calloc(1, MAX_FILENAME);
   dataField      = readPacketSubfield(dataField, filename, debugFlag);
-
-  struct SendFileThreadInfo sendFileThreadInfo;
-  strcpy(sendFileThreadInfo.socketDescriptor, socketDescriptor);
-  strcpy(sendFileThreadInfo.filename, filename);
-  // sock des
-  // debug flag
 
   char* end;
   char* requesterTcpInfo = calloc(1, 64);
@@ -368,4 +397,5 @@ void handleFileReqPacket(int socketDescriptor, char* dataField, bool debugFlag) 
   // Send file
   pthread_t processId;
   pthread_create(&processId, NULL, sendFile, &sendFileThreadInfo);
+  */
 }

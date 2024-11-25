@@ -11,4 +11,9 @@ long int tcpReceiveBytes(int, char*, long unsigned int, uint8_t);
 void tcpSendFile(int, char*, bool);
 long int tcpReceiveFile(int, char*, bool);
 
+struct sockaddr_in getTcpSocketInfo(int);
+
+int checkTcpSocket(int, struct sockaddr_in*, uint8_t);
+int tcpConnect(const char*, int, struct sockaddr*, socklen_t);
+
 #endif

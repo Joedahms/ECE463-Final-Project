@@ -8,12 +8,12 @@ STEST = server_test_directory
 
 all: server client
 
-server: server.o network_node.o packet.o resource.o serverPacket.o
-	gcc server.o network_node.o packet.o resource.o serverPacket.o -o server
+server: server.o network_node.o packet.o resource.o udp.o serverPacket.o
+	gcc server.o network_node.o packet.o resource.o udp.o serverPacket.o -o server
 	mv server server_test_directory
 
-client: client.o network_node.o packet.o tcp.o clientPacket.o
-	gcc client.o network_node.o packet.o tcp.o clientPacket.o -o client
+client: client.o network_node.o packet.o tcp.o udp.o clientPacket.o
+	gcc client.o network_node.o packet.o tcp.o udp.o clientPacket.o -o client
 	cp client client_test_directory01
 	mv client client_test_directory
 
@@ -34,6 +34,9 @@ resource.o: $(S)resource.c $(S)resource.h
 
 tcp.o: $(CO)tcp.c $(CO)tcp.h
 	gcc $(CFLAGS) $(CO)tcp.c
+
+udp.o: $(CO)udp.c $(CO)udp.h
+	gcc $(CFLAGS) $(CO)udp.c
 
 clientPacket.o: $(CL)clientPacket.c $(CL)clientPacket.h
 	gcc $(CFLAGS) $(CL)clientPacket.c

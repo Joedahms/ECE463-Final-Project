@@ -9,7 +9,7 @@ void handleConnectionPacket(
     struct sockaddr_in, struct ConnectedClient*, struct Resource*, char*, bool);
 void handleStatusPacket(struct sockaddr_in, struct ConnectedClient*);
 int handleResourcePacket(int, struct sockaddr_in, struct Resource*, bool);
-void handleTcpInfoPacket(
+void handleClientInfoPacket(
     int, struct sockaddr_in, struct ConnectedClient*, struct Resource*, char*, bool);
 
 #endif

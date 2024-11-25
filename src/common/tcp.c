@@ -1,5 +1,6 @@
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -161,4 +162,74 @@ int setupTcpSocket(struct sockaddr_in hostAddress) {
     exit(1);
   }
   return tcpSocketDescriptor;
+}
+
+struct sockaddr_in getTcpSocketInfo(int tcpSocketDescriptor) {
+  struct sockaddr_in socketInfo;
+  socklen_t socketInfoSize = sizeof(socketInfo);
+  getsockname(tcpSocketDescriptor, (struct sockaddr*)&socketInfo, &socketInfoSize);
+  return socketInfo;
+}
+
+/*
+ * Name: checkTcpSocket
+ * Purpose: Check if any new clients are trying to establish their TCP connection
+ * Input:
+ * - Data structure to store client info in if there is an incoming connection
+ * - Debug flag
+ * Output:
+ * - 0: No incoming TCP connections
+ * - 1: There is an incoming connection. Its info has been stored in incomingAddress.
+ */
+int checkTcpSocket(int tcpSocketDescriptor,
+                   struct sockaddr_in* incomingAddress,
+                   uint8_t debugFlag) {
+  if (debugFlag) {
+  }
+  socklen_t incomingAddressLength = sizeof(incomingAddress);
+  tcpSocketDescriptor   = accept(tcpSocketDescriptor, (struct sockaddr*)incomingAddress,
+                                 &incomingAddressLength);
+  int nonBlockingReturn = handleErrorNonBlocking(tcpSocketDescriptor);
+
+  if (nonBlockingReturn == 0) { // Data to be read
+    if (debugFlag) {
+      printf("Incoming TCP connection\n");
+    }
+    return 1; // Return 1
+  }
+  else { // No data to be read
+    if (debugFlag) {
+      printf("No incoming TCP connection\n");
+    }
+
+    return 0; // Return 0
+  }
+}
+
+/*
+ * Purpose: Connect to another IPV4 socket via TCP
+ * Input:
+ * - Name of the node to connect to
+ * - Socket on calling node process
+ * - addrinfo structure containing information about node to connect to
+ * Output:
+ * - Connected socket descriptor
+ */
+int tcpConnect(const char* nodeName,
+               int socketDescriptor,
+               struct sockaddr* destinationAddress,
+               socklen_t destinationAddressLength) {
+  printf("Connecting to %s...\n", nodeName);
+  int connectionStatus;
+  connectionStatus =
+      connect(socketDescriptor, destinationAddress, destinationAddressLength);
+  // Check if connection was successful
+  if (connectionStatus != 0) {
+    char* errorMessage = malloc(1024);
+    strcpy(errorMessage, strerror(errno));
+    printf("Connection to %s failed with error %s\n", nodeName, errorMessage);
+    exit(1);
+  }
+  printf("Connected to %s...\n", nodeName);
+  return socketDescriptor;
 }

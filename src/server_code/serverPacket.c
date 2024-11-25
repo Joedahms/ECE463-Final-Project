@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../common/packet.h"
+#include "../common/udp.h"
 #include "resource.h"
 #include "server.h"
 #include "serverPacket.h"
@@ -69,8 +70,8 @@ void handlePacket(char* packet,
     if (debugFlag) {
       printf("Type of packet received is tcpinfo\n");
     }
-    handleTcpInfoPacket(udpSocketDescriptor, clientUdpAddress, connectedClients,
-                        headResource, packetFields.data, debugFlag);
+    handleClientInfoPacket(udpSocketDescriptor, clientUdpAddress, connectedClients,
+                           headResource, packetFields.data, debugFlag);
     break;
 
   default:
@@ -203,10 +204,10 @@ int handleResourcePacket(int udpSocketDescriptor,
 }
 
 /*
- * Purpose: When the server recieves a tcpinfo packet, this function is called. If a
- * tcpinfo packet is received by the server it means a client is looking for a file in the
- * network. Find the client that is hosting the file. Send back the filename along with
- * socket address structures containing info about the TCP and UDP socket open on the
+ * Purpose: When the server recieves a packet of this type, this function is called. If a
+ * packet of this type is received by the server it means a client is looking for a file
+ * in the network. Find the client that is hosting the file. Send back the filename along
+ * with socket address structures containing info about the TCP and UDP socket open on the
  * hosting client.
  * Input:
  * - UDP socket descriptor on the server
@@ -217,12 +218,12 @@ int handleResourcePacket(int udpSocketDescriptor,
  * - Debug flag
  * Output: None
  */
-void handleTcpInfoPacket(int udpSocketDescriptor,
-                         struct sockaddr_in clientUdpAddress,
-                         struct ConnectedClient* connectedClients,
-                         struct Resource* headResource,
-                         char* packetData,
-                         bool debugFlag) {
+void handleClientInfoPacket(int udpSocketDescriptor,
+                            struct sockaddr_in clientUdpAddress,
+                            struct ConnectedClient* connectedClients,
+                            struct Resource* headResource,
+                            char* packetData,
+                            bool debugFlag) {
   struct PacketFields packetFields;
   strcpy(packetFields.type, "tcpinfo");
 
@@ -237,16 +238,28 @@ void handleTcpInfoPacket(int udpSocketDescriptor,
         strcat(packetFields.data, packetData);
         strcat(packetFields.data, packetDelimiters.subfield);
 
+        // TCP address
+        char tcpAddress[64];
+        sprintf(tcpAddress, "%d", connectedClients[i].socketTcpAddress.sin_addr.s_addr);
+        strcat(packetFields.data, tcpAddress);
+        strcat(packetFields.data, packetDelimiters.subfield);
+
+        // TCP port
+        char tcpPort[64];
+        sprintf(tcpPort, "%d", connectedClients[i].socketTcpAddress.sin_port);
+        strcat(packetFields.data, tcpPort);
+        strcat(packetFields.data, packetDelimiters.subfield);
+
         // UDP address
-        char address[64];
-        sprintf(address, "%d", connectedClients[i].socketUdpAddress.sin_addr.s_addr);
-        strcat(packetFields.data, address);
+        char udpAddress[64];
+        sprintf(udpAddress, "%d", connectedClients[i].socketUdpAddress.sin_addr.s_addr);
+        strcat(packetFields.data, udpAddress);
         strcat(packetFields.data, packetDelimiters.subfield);
 
         // UDP port
-        char port[64];
-        sprintf(port, "%d", connectedClients[i].socketUdpAddress.sin_port);
-        strcat(packetFields.data, port);
+        char udpPort[64];
+        sprintf(udpPort, "%d", connectedClients[i].socketUdpAddress.sin_port);
+        strcat(packetFields.data, udpPort);
         strcat(packetFields.data, packetDelimiters.subfield);
 
         printf("packet data: %s\n", packetFields.data);

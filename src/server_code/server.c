@@ -13,6 +13,7 @@
 
 #include "../common/network_node.h"
 #include "../common/packet.h"
+#include "../common/udp.h"
 #include "resource.h"
 #include "server.h"
 #include "serverPacket.h"

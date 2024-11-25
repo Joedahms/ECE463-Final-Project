@@ -15,6 +15,7 @@
 #include "../common/network_node.h"
 #include "../common/packet.h"
 #include "../common/tcp.h"
+#include "../common/udp.h"
 #include "client.h"
 #include "clientPacket.h"
 
@@ -51,7 +52,7 @@ int main(int argc, char* argv[]) {
   hostTcpAddress.sin_port = 0; // Wildcard
   tcpSocketDescriptor     = setupTcpSocket(hostTcpAddress);
 
-  hostTcpAddress = getTcpSocketInfo();
+  hostTcpAddress = getTcpSocketInfo(tcpSocketDescriptor);
 
   bool debugFlag = false;
   checkCommandLineArguments(argc, argv, &debugFlag);
@@ -88,6 +89,28 @@ int main(int argc, char* argv[]) {
       }
 
       free(userInput);
+    }
+
+    struct sockaddr_in incomingTcpConnection;
+    struct sockaddr_in incomingUdpConnection;
+    if (checkTcpSocket(&incomingTcpConnection, debugFlag) == 1) {
+      pid_t processId;
+      if ((processId = fork()) == -1) { // Fork error
+        perror("Error when forking a process for a new client");
+      }
+      else if (processId == 0) { // Child process
+        // wait for file request packet
+        // send requested file
+        while (checkUdpSocket(udpSocketDescriptor, &incomingUdpConnection, packet,
+                              debugFlag) == 0) {
+          ;
+        }
+        handlePacket(packet, tcpSocketDescriptor, udpSocketDescriptor,
+                     incomingUdpConnection, debugFlag);
+        exit(0);
+      }
+      else { // Parent process
+      }
     }
 
     // No message in UDP queue
@@ -132,7 +155,7 @@ int handleUserInput(char* userInput, struct sockaddr_in serverAddress, bool debu
   }
   else if (strncmp(userInput, "request", 7) == 0) {
     userInput += 8;
-    sendTcpInfoPacket(udpSocketDescriptor, serverAddress, userInput, debugFlag);
+    sendClientInfoPacket(udpSocketDescriptor, serverAddress, userInput, debugFlag);
   }
   else {
     printf("Invalid command, please try again\n");
@@ -197,26 +220,6 @@ int getAvailableResources(char* availableResources, const char* directoryName) {
   return 0;
 }
 
-void* receiveFile(void* input) {
-  struct ReceiveFileThreadInfo* receiveFileThreadInfo;
-  receiveFileThreadInfo = (struct ReceiveFileThreadInfo*)input;
-
-  tcpReceiveFile(receiveFileThreadInfo->socketDescriptor, receiveFileThreadInfo->filename,
-                 receiveFileThreadInfo->debugFlag);
-  return NULL;
-}
-
-void* sendFile(void* input) {
-  struct SendFileThreadInfo* sendFileThreadInfo;
-  sendFileThreadInfo = (struct SendFileThreadInfo*)input;
-
-  struct sockaddr_in tcpSocketDescriptor;
-  tcpSocketDescriptor.sin_addr.s_addr = sendFileThreadInfo
-
-  tcpSendFile();
-  return NULL;
-}
-
 /*
  * Purpose: Ask the user what username they would like to use when connecting to the
  * server. Allows the user to use their default username on the OS, or choose their own.
@@ -254,11 +257,4 @@ void setUsername(char* username) {
     }
     free(userInput);
   }
-}
-
-struct sockaddr_in getTcpSocketInfo() {
-  struct sockaddr_in socketInfo;
-  socklen_t socketInfoSize = sizeof(socketInfo);
-  getsockname(tcpSocketDescriptor, (struct sockaddr*)&socketInfo, &socketInfoSize);
-  return socketInfo;
 }
