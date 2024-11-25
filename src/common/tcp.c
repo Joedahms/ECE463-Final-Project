@@ -98,10 +98,14 @@ long int tcpReceiveFile(int socketDescriptor, char* fileName, bool debugFlag) {
   printf("Receiving file...\n");
   char* incomingFileContents = malloc(MAX_FILE_SIZE); // Space for file contents
   long int numberOfBytesReceived;                     // How many bytes received
-  numberOfBytesReceived = recv(socketDescriptor, incomingFileContents, MAX_FILE_SIZE, 0);
+  while (numberOfBytesReceived == 0 || numberOfBytesReceived == -1) {
+    printf("%ld\n", numberOfBytesReceived);
+    numberOfBytesReceived =
+        recv(socketDescriptor, incomingFileContents, MAX_FILE_SIZE, 0);
+  }
 
-  int writeFileReturn =
-      writeFile(fileName, incomingFileContents, (long unsigned int)numberOfBytesReceived);
+  int writeFileReturn = writeFile(fileName, incomingFileContents,
+                                  (long unsigned int)numberOfBytesReceived, debugFlag);
   if (writeFileReturn == -1) {
     return -1;
   }
@@ -114,4 +118,47 @@ long int tcpReceiveFile(int socketDescriptor, char* fileName, bool debugFlag) {
     printf("Received file\n");
   }
   return 0;
+}
+
+/*
+ * Name: setupTcpSocket
+ * Purpose: Setup the TCP socket. Set it non blocking. Bind it. Set it to listen.
+ * Input: Address structure to bind to.
+ * Output: The setup TCP socket descriptor.
+ */
+int setupTcpSocket(struct sockaddr_in hostAddress) {
+  int tcpSocketDescriptor;
+
+  // Set up TCP socket
+  printf("Setting up TCP socket...\n");
+  tcpSocketDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+  if (tcpSocketDescriptor == -1) {
+    perror("Error when setting up TCP socket");
+    exit(1);
+  }
+
+  // Set non blocking
+  int fcntlReturn = fcntl(tcpSocketDescriptor, F_SETFL, O_NONBLOCK);
+  if (fcntlReturn == -1) {
+    perror("Error when setting TCP socket to non blocking");
+  }
+  printf("TCP socket set up\n");
+
+  // Bind TCP socket
+  printf("Binding TCP socket...\n");
+  int bindReturnTCP =
+      bind(tcpSocketDescriptor, (struct sockaddr*)&hostAddress, sizeof(hostAddress));
+  if (bindReturnTCP == -1) {
+    perror("Error when binding TCP socket");
+    exit(1);
+  }
+  printf("TCP socket bound\n");
+
+  // Set socket to listen
+  int listenReturn = listen(tcpSocketDescriptor, 10);
+  if (listenReturn == -1) {
+    perror("TCP socket listen error");
+    exit(1);
+  }
+  return tcpSocketDescriptor;
 }

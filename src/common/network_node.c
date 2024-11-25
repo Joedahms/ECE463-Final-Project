@@ -34,7 +34,8 @@ void checkCommandLineArguments(int argc, char** argv, bool* debugFlag) {
     if (strcmp(argv[1], "-d") == 0) {
       *debugFlag = 1;
       printf("Running %s in debug mode\n", programName);
-    } else {
+    }
+    else {
       printf("Invalid usage of %s", programName);
     }
     break;
@@ -72,7 +73,8 @@ void sendUdpMessage(int udpSocketDescriptor,
   if (sendtoReturn == -1) {
     perror("UDP send error");
     exit(1);
-  } else if (debugFlag) {
+  }
+  else if (debugFlag) {
     printf("UDP message sent\n");
   }
 }
@@ -161,12 +163,16 @@ int readFile(char* fileName, char* buffer, bool debugFlag) {
  * - -1: Error
  * - 0: Success
  */
-int writeFile(char* fileName, char* fileContents, size_t fileSize) {
+int writeFile(char* filename, char* fileContents, size_t fileSize, bool debugFlag) {
   int fileDesciptor;
+  if (debugFlag) {
+    printf("Writing to file: %s...\n", filename);
+    printf("File size: %ld\n", fileSize);
+  }
 
   // Open file to write to
   // Create if doesn't exist. Read/write
-  fileDesciptor = open(fileName, (O_CREAT | O_RDWR), S_IRWXU);
+  fileDesciptor = open(filename, (O_CREAT | O_RDWR), S_IRWXU);
   if (fileDesciptor == -1) {
     perror("Error opening file");
     return -1;
@@ -270,55 +276,14 @@ int handleErrorNonBlocking(int returnValue) {
     // Errors occuring from no message on non blocking socket
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       return 1;
-    } else { // Relevant error
+    }
+    else { // Relevant error
       perror("Error when checking non blocking socket");
       exit(1);
       return 1;
     }
-  } else { // Got a message
+  }
+  else { // Got a message
     return 0;
   }
-}
-
-/*
- * Name: setupTcpSocket
- * Purpose: Setup the TCP socket. Set it non blocking. Bind it. Set it to listen.
- * Input: Address structure to bind to.
- * Output: The setup TCP socket descriptor.
- */
-int setupTcpSocket(struct sockaddr_in hostAddress) {
-  int tcpSocketDescriptor;
-
-  // Set up TCP socket
-  printf("Setting up TCP socket...\n");
-  tcpSocketDescriptor = socket(AF_INET, SOCK_STREAM, 0);
-  if (tcpSocketDescriptor == -1) {
-    perror("Error when setting up TCP socket");
-    exit(1);
-  }
-
-  // Set non blocking
-  int fcntlReturn = fcntl(tcpSocketDescriptor, F_SETFL, O_NONBLOCK);
-  if (fcntlReturn == -1) {
-    perror("Error when setting TCP socket to non blocking");
-  }
-  printf("TCP socket set up\n");
-
-  // Bind TCP socket
-  printf("Binding TCP socket...\n");
-  int bindReturnTCP =
-      bind(tcpSocketDescriptor, (struct sockaddr*)&hostAddress, sizeof(hostAddress));
-  if (bindReturnTCP == -1) {
-    perror("Error when binding TCP socket");
-    exit(1);
-  }
-  printf("TCP socket bound\n");
-
-  // Set socket to listen
-  int listenReturn = listen(tcpSocketDescriptor, 10);
-  if (listenReturn == -1) {
-    perror("TCP socket listen error");
-    exit(1);
-  }
-  return tcpSocketDescriptor;
 }

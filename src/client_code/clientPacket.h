@@ -15,6 +15,6 @@ void sendTcpInfoPacket(int, struct sockaddr_in, char*, bool);
 void handleTcpInfoPacket(int, int, char*, bool);
 
 void sendFileReqPacket(int, int, struct sockaddr_in, char*, bool);
-void handleFileReqPacket(char*, bool);
+void handleFileReqPacket(int, char*, bool);
 
 #endif

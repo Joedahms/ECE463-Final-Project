@@ -198,15 +198,24 @@ int getAvailableResources(char* availableResources, const char* directoryName) {
 }
 
 void* receiveFile(void* input) {
-  struct ReceiveThreadInfo* receiveThreadInfo;
-  receiveThreadInfo = (struct ReceiveThreadInfo*)input;
+  struct ReceiveFileThreadInfo* receiveFileThreadInfo;
+  receiveFileThreadInfo = (struct ReceiveFileThreadInfo*)input;
 
-  tcpReceiveFile(receiveThreadInfo->socketDescriptor, receiveThreadInfo->filename,
-                 receiveThreadInfo->debugFlag);
+  tcpReceiveFile(receiveFileThreadInfo->socketDescriptor, receiveFileThreadInfo->filename,
+                 receiveFileThreadInfo->debugFlag);
   return NULL;
 }
 
-void* sendFile(void*) { return NULL; }
+void* sendFile(void* input) {
+  struct SendFileThreadInfo* sendFileThreadInfo;
+  sendFileThreadInfo = (struct SendFileThreadInfo*)input;
+
+  struct sockaddr_in tcpSocketDescriptor;
+  tcpSocketDescriptor.sin_addr.s_addr = sendFileThreadInfo
+
+  tcpSendFile();
+  return NULL;
+}
 
 /*
  * Purpose: Ask the user what username they would like to use when connecting to the

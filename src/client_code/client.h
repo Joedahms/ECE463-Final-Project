@@ -4,12 +4,13 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 
-struct SendThreadInfo {
-  struct sockaddr_in fileHost;
+struct SendFileThreadInfo {
+  int socketDescriptor;
+  struct sockaddr_in fileRequester;
   char filename[MAX_FILENAME];
 };
 
-struct ReceiveThreadInfo {
+struct ReceiveFileThreadInfo {
   int socketDescriptor;
   char filename[MAX_FILENAME];
   bool debugFlag;

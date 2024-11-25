@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+int setupTcpSocket(struct sockaddr_in);
+
 long int tcpSendBytes(int, const char*, unsigned long int, uint8_t);
 long int tcpReceiveBytes(int, char*, long unsigned int, uint8_t);
 

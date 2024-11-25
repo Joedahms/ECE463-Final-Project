@@ -67,7 +67,7 @@ void handlePacket(char* packet,
     if (debugFlag) {
       printf("Type of packet recieved is filereq\n");
     }
-    handleFileReqPacket(packetFields.data, debugFlag);
+    handleFileReqPacket(udpSocketDescriptor, packetFields.data, debugFlag);
 
   default:
   }
@@ -296,12 +296,12 @@ void sendFileReqPacket(int tcpSocketDescriptor,
                        char* filename,
                        bool debugFlag) {
   // Start thread to receive file
-  struct ReceiveThreadInfo receiveThreadInfo;
-  receiveThreadInfo.socketDescriptor = tcpSocketDescriptor;
-  strcpy(receiveThreadInfo.filename, filename);
-  receiveThreadInfo.debugFlag = debugFlag;
+  struct ReceiveFileThreadInfo receiveFileThreadInfo;
+  receiveFileThreadInfo.socketDescriptor = tcpSocketDescriptor;
+  strcpy(receiveFileThreadInfo.filename, filename);
+  receiveFileThreadInfo.debugFlag = debugFlag;
   pthread_t processId;
-  pthread_create(&processId, NULL, receiveFile, &receiveThreadInfo);
+  pthread_create(&processId, NULL, receiveFile, &receiveFileThreadInfo);
 
   // Requesting client socket address
   struct sockaddr_in tcpSocketInfo;
@@ -341,28 +341,31 @@ void sendFileReqPacket(int tcpSocketDescriptor,
  * - Debug flag
  * Output: None
  */
-void handleFileReqPacket(char* dataField, bool debugFlag) {
+void handleFileReqPacket(int socketDescriptor, char* dataField, bool debugFlag) {
   // Determine filename to send
   char* filename = calloc(1, MAX_FILENAME);
   dataField      = readPacketSubfield(dataField, filename, debugFlag);
 
-  struct SendThreadInfo sendThreadInfo;
-  strcpy(sendThreadInfo.filename, filename);
+  struct SendFileThreadInfo sendFileThreadInfo;
+  strcpy(sendFileThreadInfo.socketDescriptor, socketDescriptor);
+  strcpy(sendFileThreadInfo.filename, filename);
+  // sock des
+  // debug flag
 
   char* end;
   char* requesterTcpInfo = calloc(1, 64);
 
   dataField    = readPacketSubfield(dataField, requesterTcpInfo, debugFlag);
   long address = strtol(requesterTcpInfo, &end, 10);
-  sendThreadInfo.fileHost.sin_addr.s_addr = (unsigned int)address;
+  sendThreadInfo.fileRequester.sin_addr.s_addr = (unsigned int)address;
 
   dataField = readPacketSubfield(dataField, requesterTcpInfo, debugFlag);
   long port = strtol(requesterTcpInfo, &end, 10);
-  sendThreadInfo.fileHost.sin_port = (short unsigned int)port;
+  sendThreadInfo.fileRequester.sin_port = (short unsigned int)port;
 
   free(filename);
 
   // Send file
   pthread_t processId;
-  pthread_create(&processId, NULL, sendFile, &sendThreadInfo);
+  pthread_create(&processId, NULL, sendFile, &sendFileThreadInfo);
 }

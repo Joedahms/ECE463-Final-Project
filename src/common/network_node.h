@@ -40,12 +40,10 @@ void printReceivedMessage(struct sockaddr_in, long int, char*, bool);
 
 // File I/O
 int readFile(char*, char*, bool);
-int writeFile(char*, char*, size_t);
+int writeFile(char*, char*, size_t, bool);
 
 int setupUdpSocket(struct sockaddr_in, bool);
 int checkUdpSocket(int, struct sockaddr_in*, char*, bool);
 int handleErrorNonBlocking(int);
-
-int setupTcpSocket(struct sockaddr_in);
 
 #endif
