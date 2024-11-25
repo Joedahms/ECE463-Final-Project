@@ -8,6 +8,6 @@
 
 void sendUdpMessage(int, struct sockaddr_in, char*, bool);
 int setupUdpSocket(struct sockaddr_in, bool);
-int checkUdpSocket(int, struct sockaddr_in*, char*, bool);
+bool checkUdpSocket(int, struct sockaddr_in*, char*, bool);
 
 #endif

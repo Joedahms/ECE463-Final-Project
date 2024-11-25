@@ -96,13 +96,13 @@ int setupUdpSocket(struct sockaddr_in serverAddress, bool bindFlag) {
  * - Buffer to read message into
  * - Debug flag
  * Output: None
- * 0: No incoming messages
- * 1: There is an incoming message
+ * true: There is an incoming message
+ * false: No incoming messages
  */
-int checkUdpSocket(int listeningUDPSocketDescriptor,
-                   struct sockaddr_in* incomingAddress,
-                   char* message,
-                   bool debugFlag) {
+bool checkUdpSocket(int listeningUDPSocketDescriptor,
+                    struct sockaddr_in* incomingAddress,
+                    char* message,
+                    bool debugFlag) {
   socklen_t incomingAddressLength = sizeof(incomingAddress);
   long int bytesReceived =
       recvfrom(listeningUDPSocketDescriptor, message, 250, 0,
@@ -111,10 +111,10 @@ int checkUdpSocket(int listeningUDPSocketDescriptor,
 
   // No incoming message
   if (nonBlockingReturn == 1) {
-    return 0;
+    return false;
   }
 
   // Incoming message
   printReceivedMessage(*incomingAddress, bytesReceived, message, debugFlag);
-  return 1;
+  return true;
 }

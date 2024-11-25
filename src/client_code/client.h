@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 
-void getUserInput(char*);
-int handleUserInput(char*, struct sockaddr_in, bool);
+int getUserInput(char*, int);
+void handleUserInput(char*, struct sockaddr_in, bool);
 
 void shutdownClient();
 void receiveMessageFromServer();

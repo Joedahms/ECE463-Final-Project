@@ -62,38 +62,22 @@ int main(int argc, char* argv[]) {
     printf("Error sending connection packet\n");
   }
 
-  fd_set read_fds;
-  packet = calloc(1, MAX_PACKET);
+  struct sockaddr_in incomingTcpConnection;
+  struct sockaddr_in incomingUdpConnection;
+  packet          = calloc(1, MAX_PACKET);
+  char* userInput = calloc(1, MAX_USER_INPUT);
 
   // Loop to handle user input and incoming packets
   while (1) {
-    // Use select to handle user input and server messages simultaneously
-    FD_ZERO(&read_fds);
-    FD_SET(0, &read_fds);                   // 0 is stdin (for user input)
-    FD_SET(udpSocketDescriptor, &read_fds); // The socket for receiving server messages
-
-    int activity = select(udpSocketDescriptor + 1, &read_fds, NULL, NULL, NULL);
-
-    if (activity < 0 && errno != EINTR) {
-      perror("select error");
+    int userInputReturn = getUserInput(userInput, 100);
+    if (userInputReturn == -1) {
+      printf("Error getting user input\n");
+    }
+    else if (userInputReturn == 1) {
+      handleUserInput(userInput, serverAddress, debugFlag);
     }
 
-    // User input
-    if (FD_ISSET(0, &read_fds)) {
-      char* userInput = calloc(1, MAX_USER_INPUT);
-      getUserInput(userInput);
-      int handleUserInputReturn = handleUserInput(userInput, serverAddress, debugFlag);
-
-      if (handleUserInputReturn == -1) {
-        continue;
-      }
-
-      free(userInput);
-    }
-
-    struct sockaddr_in incomingTcpConnection;
-    struct sockaddr_in incomingUdpConnection;
-    if (checkTcpSocket(&incomingTcpConnection, debugFlag) == 1) {
+    if (checkTcpSocket(tcpSocketDescriptor, &incomingTcpConnection, debugFlag) == 1) {
       pid_t processId;
       if ((processId = fork()) == -1) { // Fork error
         perror("Error when forking a process for a new client");
@@ -113,18 +97,15 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    // No message in UDP queue
-    if (!(FD_ISSET(udpSocketDescriptor, &read_fds))) {
-      continue;
+    if (checkUdpSocket(udpSocketDescriptor, &incomingUdpConnection, packet, debugFlag)) {
+      // Message in UDP queue
+      if (debugFlag) {
+        printf("Packet received\n");
+      }
+      recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
+      handlePacket(packet, tcpSocketDescriptor, udpSocketDescriptor, serverAddress,
+                   debugFlag);
     }
-
-    // Message in UDP queue
-    if (debugFlag) {
-      printf("Packet received\n");
-    }
-    recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
-    handlePacket(packet, tcpSocketDescriptor, udpSocketDescriptor, serverAddress,
-                 debugFlag);
   }
   return 0;
 }
@@ -134,9 +115,43 @@ int main(int argc, char* argv[]) {
  * Input: String to store user input in
  * Output: None
  */
-void getUserInput(char* userInput) {
+int getUserInput(char* userInput, int timeoutUs) {
+  /*
   fgets(userInput, MAX_USER_INPUT, stdin);
   userInput[strcspn(userInput, "\n")] = 0;
+  return 1;
+  */
+
+  fd_set readfds;
+  struct timeval tv;
+
+  // Set up the file descriptor set
+  FD_ZERO(&readfds);
+  FD_SET(STDIN_FILENO, &readfds);
+
+  // Set up the timeout
+  tv.tv_sec  = 0;
+  tv.tv_usec = timeoutUs;
+
+  // Wait for input
+  int ready = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv);
+
+  if (ready == -1) {
+    // Error occurred
+    return -1;
+  }
+  else if (ready == 0) {
+    // Timeout occurred
+    return 0;
+  }
+
+  // Input is available, read it
+  if (fgets(userInput, MAX_USER_INPUT, stdin) == NULL) {
+    return -1;
+  }
+
+  userInput[strcspn(userInput, "\n")] = 0;
+  return 1;
 }
 
 /*
@@ -145,11 +160,9 @@ void getUserInput(char* userInput) {
  * - The user's input
  * - The socket address of the server
  * - Debug flag
- * Output:
- * - -1: User just pressed return
- * - 0: All went swimmingly
+ * Output: None
  */
-int handleUserInput(char* userInput, struct sockaddr_in serverAddress, bool debugFlag) {
+void handleUserInput(char* userInput, struct sockaddr_in serverAddress, bool debugFlag) {
   if (strcmp(userInput, "resources") == 0) {
     sendResourcePacket(udpSocketDescriptor, serverAddress, debugFlag);
   }
@@ -163,13 +176,6 @@ int handleUserInput(char* userInput, struct sockaddr_in serverAddress, bool debu
     printf("resources: See what resources are available on the network\n");
     printf("request:   Request a resource on the network by filename\n");
   }
-
-  // User just pressed return
-  if (strlen(userInput) == 0) {
-    free(userInput);
-    return -1;
-  }
-  return 0;
 }
 
 /*
@@ -235,7 +241,9 @@ void setUsername(char* username) {
   while (validUsername == false) {
     validUsername   = true;
     char* userInput = calloc(1, MAX_USER_INPUT);
-    getUserInput(userInput);
+    while (getUserInput(userInput, 100) == 0) {
+      ;
+    }
 
     // System
     if (strcmp(userInput, "0") == 0) {
@@ -246,7 +254,9 @@ void setUsername(char* username) {
     else if (strcmp(userInput, "1") == 0) {
       memset(userInput, 0, MAX_USER_INPUT);
       printf("Custom username chosen, please enter custom username:\n");
-      getUserInput(userInput);
+      while (getUserInput(userInput, 100) == 0) {
+        ;
+      }
       strcpy(username, userInput);
       printf("Welcome %s\n", username);
     }

@@ -192,16 +192,9 @@ int checkTcpSocket(int tcpSocketDescriptor,
   int nonBlockingReturn = handleErrorNonBlocking(tcpSocketDescriptor);
 
   if (nonBlockingReturn == 0) { // Data to be read
-    if (debugFlag) {
-      printf("Incoming TCP connection\n");
-    }
-    return 1; // Return 1
+    return 1;                   // Return 1
   }
-  else { // No data to be read
-    if (debugFlag) {
-      printf("No incoming TCP connection\n");
-    }
-
+  else {      // No data to be read
     return 0; // Return 0
   }
 }
