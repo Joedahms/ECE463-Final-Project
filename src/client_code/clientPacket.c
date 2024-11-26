@@ -70,7 +70,7 @@ void handlePacket(char* packet,
     if (debugFlag) {
       printf("Type of packet recieved is filereq\n");
     }
-    handleFileReqPacket(udpSocketDescriptor, packetFields.data, debugFlag);
+    handleFileReqPacket(tcpSocketDescriptor, packetFields.data, debugFlag);
 
   default:
   }
@@ -235,11 +235,11 @@ void sendClientInfoPacket(int udpSocketDescriptor,
 }
 
 /*
- * Purpose: When the client receives a tcpinfo packet, this function extracts
+ * Purpose: When the client receives a packet of this type, this function extracts
  * the ip address and port of the client on the network who is hosting the file that the
  * user requested
  * Input:
- * - Data field of the tcpinfo packet sent from the server
+ * - Data field of the packet sent from the server
  * - Debug flag
  * Output: Socket address struct of the client hosting the file
  */
@@ -302,6 +302,8 @@ void handleClientInfoPacket(int tcpSocketDescriptor,
   if ((processId = fork()) == -1) { // Fork error
     perror("Error when forking a process for a new client");
   }
+
+  // listening
   else if (processId == 0) { // Child process
     tcpSocketDescriptor =
         tcpConnect("client", tcpSocketDescriptor, (struct sockaddr*)&fileHostTcpAddress,
@@ -372,30 +374,12 @@ void sendFileReqPacket(int tcpSocketDescriptor,
  * Output: None
  */
 void handleFileReqPacket(int socketDescriptor, char* dataField, bool debugFlag) {
-  printf("%d", socketDescriptor);
-  printf("%s", dataField);
   if (debugFlag) {
+    printf("Handling file request packet\n");
   }
-  /*
-  // Determine filename to send
+
   char* filename = calloc(1, MAX_FILENAME);
   dataField      = readPacketSubfield(dataField, filename, debugFlag);
 
-  char* end;
-  char* requesterTcpInfo = calloc(1, 64);
-
-  dataField    = readPacketSubfield(dataField, requesterTcpInfo, debugFlag);
-  long address = strtol(requesterTcpInfo, &end, 10);
-  sendThreadInfo.fileRequester.sin_addr.s_addr = (unsigned int)address;
-
-  dataField = readPacketSubfield(dataField, requesterTcpInfo, debugFlag);
-  long port = strtol(requesterTcpInfo, &end, 10);
-  sendThreadInfo.fileRequester.sin_port = (short unsigned int)port;
-
-  free(filename);
-
-  // Send file
-  pthread_t processId;
-  pthread_create(&processId, NULL, sendFile, &sendFileThreadInfo);
-  */
+  tcpSendFile(socketDescriptor, filename, debugFlag);
 }

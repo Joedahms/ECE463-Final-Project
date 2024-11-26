@@ -162,13 +162,14 @@ int writeFile(char* filename, char* fileContents, size_t fileSize, bool debugFla
  * - 0: There is data waiting to be read
  * - 1: No data waiting to be read
  */
-int handleErrorNonBlocking(int returnValue) {
+int handleErrorNonBlocking(int returnValue, char* info) {
   if (returnValue == -1) {
     // Errors occuring from no message on non blocking socket
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       return 1;
     }
     else { // Relevant error
+      printf("%s\n", info);
       perror("Error when checking non blocking socket");
       exit(1);
       return 1;

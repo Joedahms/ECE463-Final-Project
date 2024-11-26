@@ -225,9 +225,11 @@ void handleClientInfoPacket(int udpSocketDescriptor,
                             char* packetData,
                             bool debugFlag) {
   struct PacketFields packetFields;
+  memset(&packetFields, 0, sizeof(packetFields));
   strcpy(packetFields.type, "tcpinfo");
 
   char* username = calloc(1, MAX_USERNAME);
+  printf("%s\n", packetData);
   bool fileFound = searchResourcesByFilename(headResource, username, packetData);
   if (fileFound) {
     // Send back tcp info
@@ -237,6 +239,7 @@ void handleClientInfoPacket(int udpSocketDescriptor,
         // Filename
         strcat(packetFields.data, packetData);
         strcat(packetFields.data, packetDelimiters.subfield);
+        printf("PacketFields.data: %s\n", packetFields.data);
 
         // TCP address
         char tcpAddress[64];
@@ -262,7 +265,7 @@ void handleClientInfoPacket(int udpSocketDescriptor,
         strcat(packetFields.data, udpPort);
         strcat(packetFields.data, packetDelimiters.subfield);
 
-        printf("packet data: %s\n", packetFields.data);
+        printf("packet data after handling client info packet: %s\n", packetFields.data);
         sendUdpPacket(udpSocketDescriptor, clientUdpAddress, packetFields, debugFlag);
       }
     }

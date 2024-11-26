@@ -80,40 +80,55 @@ long int tcpReceiveBytes(int incomingSocketDescriptor,
  * Output: None
  */
 void tcpSendFile(int socketDescriptor, char* fileName, bool debugFlag) {
+  if (debugFlag) {
+    printf("Sending file %s over TCP...\n", fileName);
+  }
   char* fileContents = malloc(MAX_FILE_SIZE);
   int readFileReturn = readFile(fileName, fileContents, debugFlag);
   if (readFileReturn == -1) {
     printf("Put command error when reading file");
   }
+  if (debugFlag) {
+    printf("sending %ld bytes", strlen(fileContents));
+    printf("File contents to send:\n%s", fileContents);
+  }
   tcpSendBytes(socketDescriptor, fileContents, strlen(fileContents), debugFlag);
 }
 
+// request test01.txt
+
 /*
- * Purpose: Receive file from server and write it into local directory
- * Input: File name of requested file
+ * Purpose: Receive file from connection and store into local file
+ * Input:
+ * - Socket descriptor to receive the file on
+ * - File name of requested file
+ * - Debug flag
  * Output:
  * - -1: failure
  * - 0: Success
  */
 long int tcpReceiveFile(int socketDescriptor, char* fileName, bool debugFlag) {
   printf("Receiving file...\n");
-  char* incomingFileContents = malloc(MAX_FILE_SIZE); // Space for file contents
-  long int numberOfBytesReceived;                     // How many bytes received
+  char* incomingFileContents     = malloc(MAX_FILE_SIZE); // Space for file contents
+  long int numberOfBytesReceived = 0;                     // How many bytes received
   while (numberOfBytesReceived == 0 || numberOfBytesReceived == -1) {
-    printf("%ld\n", numberOfBytesReceived);
+    printf("jereawkljas;edklhjgsadlkjhgadskjhg\n");
     numberOfBytesReceived =
         recv(socketDescriptor, incomingFileContents, MAX_FILE_SIZE, 0);
+    if (debugFlag) {
+      printf("Incoming file contents: %s\n", incomingFileContents);
+    }
+  }
+
+  if (debugFlag) {
+    printf("Received file is %ld bytes\n", numberOfBytesReceived);
+    printf("Contents of received file:\n%s\n", incomingFileContents);
   }
 
   int writeFileReturn = writeFile(fileName, incomingFileContents,
                                   (long unsigned int)numberOfBytesReceived, debugFlag);
   if (writeFileReturn == -1) {
     return -1;
-  }
-
-  if (debugFlag) {
-    printf("Received file is %ld bytes\n", numberOfBytesReceived);
-    printf("Contents of received file:\n%s\n", incomingFileContents);
   }
   else {
     printf("Received file\n");
@@ -178,24 +193,33 @@ struct sockaddr_in getTcpSocketInfo(int tcpSocketDescriptor) {
  * - Data structure to store client info in if there is an incoming connection
  * - Debug flag
  * Output:
- * - 0: No incoming TCP connections
- * - 1: There is an incoming connection. Its info has been stored in incomingAddress.
+ * -1: No incoming TCP connections
+ * Not -1: The connected TCP socket descriptor
  */
-int checkTcpSocket(int tcpSocketDescriptor,
+int checkTcpSocket(int listeningTcpSocketDescriptor,
                    struct sockaddr_in* incomingAddress,
                    uint8_t debugFlag) {
   if (debugFlag) {
+    struct sockaddr_in* test = incomingAddress;
+    if (test->sin_port) {
+    }
   }
-  socklen_t incomingAddressLength = sizeof(incomingAddress);
-  tcpSocketDescriptor   = accept(tcpSocketDescriptor, (struct sockaddr*)incomingAddress,
-                                 &incomingAddressLength);
-  int nonBlockingReturn = handleErrorNonBlocking(tcpSocketDescriptor);
+  //  socklen_t incomingAddressLength = sizeof(*incomingAddress);
+  int connectedTcpSocketDescriptor =
+      accept(listeningTcpSocketDescriptor, (struct sockaddr*)NULL, NULL);
+  printf("%d\n", connectedTcpSocketDescriptor);
+  int returnCheck       = connectedTcpSocketDescriptor;
+  int nonBlockingReturn = handleErrorNonBlocking(returnCheck, "tcp");
 
-  if (nonBlockingReturn == 0) { // Data to be read
-    return 1;                   // Return 1
+  if (nonBlockingReturn == 0) { // Incoming TCP connection
+    if (debugFlag) {
+      printf("New TCP connection established\n");
+      printf("Connected socket descriptor: %d\n", connectedTcpSocketDescriptor);
+    }
+    return connectedTcpSocketDescriptor; // Return 1
   }
-  else {      // No data to be read
-    return 0; // Return 0
+  else {       // No data to be read
+    return -1; // Return 0
   }
 }
 

@@ -41,6 +41,6 @@ void printReceivedMessage(struct sockaddr_in, long int, char*, bool);
 int readFile(char*, char*, bool);
 int writeFile(char*, char*, size_t, bool);
 
-int handleErrorNonBlocking(int);
+int handleErrorNonBlocking(int, char*);
 
 #endif

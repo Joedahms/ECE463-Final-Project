@@ -107,7 +107,7 @@ bool checkUdpSocket(int listeningUDPSocketDescriptor,
   long int bytesReceived =
       recvfrom(listeningUDPSocketDescriptor, message, 250, 0,
                (struct sockaddr*)incomingAddress, &incomingAddressLength);
-  int nonBlockingReturn = handleErrorNonBlocking((int)bytesReceived);
+  int nonBlockingReturn = handleErrorNonBlocking((int)bytesReceived, "udp");
 
   // No incoming message
   if (nonBlockingReturn == 1) {

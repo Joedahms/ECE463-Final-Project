@@ -21,7 +21,8 @@
 
 // Global so that signal handler can free resources
 int udpSocketDescriptor;
-int tcpSocketDescriptor;
+int listeningTcpSocketDescriptor;
+int connectedTcpSocketDescriptor;
 char* packet;
 
 // Packet delimiters that are constant for all packets
@@ -49,10 +50,10 @@ int main(int argc, char* argv[]) {
   // Local TCP port
   struct sockaddr_in hostTcpAddress;
   memset(&hostTcpAddress, 0, sizeof(hostTcpAddress));
-  hostTcpAddress.sin_port = 0; // Wildcard
-  tcpSocketDescriptor     = setupTcpSocket(hostTcpAddress);
+  hostTcpAddress.sin_port      = 0; // Wildcard
+  listeningTcpSocketDescriptor = setupTcpSocket(hostTcpAddress);
 
-  hostTcpAddress = getTcpSocketInfo(tcpSocketDescriptor);
+  hostTcpAddress = getTcpSocketInfo(listeningTcpSocketDescriptor);
 
   bool debugFlag = false;
   checkCommandLineArguments(argc, argv, &debugFlag);
@@ -77,7 +78,12 @@ int main(int argc, char* argv[]) {
       handleUserInput(userInput, serverAddress, debugFlag);
     }
 
-    if (checkTcpSocket(tcpSocketDescriptor, &incomingTcpConnection, debugFlag) == 1) {
+    connectedTcpSocketDescriptor =
+        checkTcpSocket(listeningTcpSocketDescriptor, &incomingTcpConnection, debugFlag);
+    if (connectedTcpSocketDescriptor != -1) { // New TCP connection established
+      if (debugFlag) {
+        printf("File being requested, new TCP connection established\n");
+      }
       pid_t processId;
       if ((processId = fork()) == -1) { // Fork error
         perror("Error when forking a process for a new client");
@@ -85,11 +91,14 @@ int main(int argc, char* argv[]) {
       else if (processId == 0) { // Child process
         // wait for file request packet
         // send requested file
+        if (debugFlag) {
+          printf("Checking UDP socket for new packets...\n");
+        }
         while (checkUdpSocket(udpSocketDescriptor, &incomingUdpConnection, packet,
                               debugFlag) == 0) {
           ;
         }
-        handlePacket(packet, tcpSocketDescriptor, udpSocketDescriptor,
+        handlePacket(packet, connectedTcpSocketDescriptor, udpSocketDescriptor,
                      incomingUdpConnection, debugFlag);
         exit(0);
       }
@@ -100,11 +109,11 @@ int main(int argc, char* argv[]) {
     if (checkUdpSocket(udpSocketDescriptor, &incomingUdpConnection, packet, debugFlag)) {
       // Message in UDP queue
       if (debugFlag) {
-        printf("Packet received\n");
+        printf("UDP packet received\n");
       }
       recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
-      handlePacket(packet, tcpSocketDescriptor, udpSocketDescriptor, serverAddress,
-                   debugFlag);
+      handlePacket(packet, listeningTcpSocketDescriptor, udpSocketDescriptor,
+                   serverAddress, debugFlag);
     }
   }
   return 0;
@@ -186,7 +195,8 @@ void handleUserInput(char* userInput, struct sockaddr_in serverAddress, bool deb
 void shutdownClient() {
   free(packet);
   close(udpSocketDescriptor);
-  close(tcpSocketDescriptor);
+  close(listeningTcpSocketDescriptor);
+  close(connectedTcpSocketDescriptor);
   printf("\n");
   exit(0);
 }
