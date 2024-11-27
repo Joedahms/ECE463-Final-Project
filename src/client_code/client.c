@@ -34,6 +34,8 @@ int main(int argc, char* argv[]) {
   // Assign callback function to handle ctrl-c
   signal(SIGINT, shutdownClient);
 
+  struct ConnectedClient connectedClients[MAX_CONNECTED_CLIENTS];
+
   // Address of server (UDP)
   struct sockaddr_in serverAddress;
   memset(&serverAddress, 0, sizeof(serverAddress));
@@ -63,104 +65,93 @@ int main(int argc, char* argv[]) {
     printf("Error sending connection packet\n");
   }
 
-  struct sockaddr_in incomingTcpConnection;
-  struct sockaddr_in incomingUdpConnection;
-  packet          = calloc(1, MAX_PACKET);
+  //  struct sockaddr_in incomingTcpConnection;
+  //  struct sockaddr_in incomingUdpConnection;
   char* userInput = calloc(1, MAX_USER_INPUT);
+  packet          = calloc(1, MAX_PACKET);
+
+  int maxFileDescriptor;
+  fd_set readSet;
+  FD_ZERO(&readSet);
+
+  // pid_t processId;
 
   // Loop to handle user input and incoming packets
   while (1) {
-    int userInputReturn = getUserInput(userInput, 100);
-    if (userInputReturn == -1) {
-      printf("Error getting user input\n");
+    FD_SET(0, &readSet); // stdin
+    FD_SET(udpSocketDescriptor, &readSet);
+    FD_SET(listeningTcpSocketDescriptor, &readSet);
+
+    maxFileDescriptor = (listeningTcpSocketDescriptor > udpSocketDescriptor)
+                            ? listeningTcpSocketDescriptor
+                            : udpSocketDescriptor;
+
+    int selectReturn = select(maxFileDescriptor + 1, &readSet, NULL, NULL, NULL);
+
+    if (selectReturn < 0 && errno != EINTR) {
+      perror("select error");
     }
-    else if (userInputReturn == 1) {
+
+    if (FD_ISSET(0, &readSet)) {
+      getUserInput(userInput);
       handleUserInput(userInput, serverAddress, debugFlag);
     }
 
-    connectedTcpSocketDescriptor =
-        checkTcpSocket(listeningTcpSocketDescriptor, &incomingTcpConnection, debugFlag);
-    if (connectedTcpSocketDescriptor != -1) { // New TCP connection established
+    // TCP socket readable
+    if (FD_ISSET(listeningTcpSocketDescriptor, &readSet)) {
+      connectedTcpSocketDescriptor = accept(listeningTcpSocketDescriptor, NULL, NULL);
       if (debugFlag) {
         printf("File being requested, new TCP connection established\n");
       }
+      int availableConnectedClient =
+          findEmptyConnectedClient(connectedClients, debugFlag);
+
+      // Pipes for communication between parent and child process
+      pipe(connectedClients[availableConnectedClient].parentToChildPipe);
+      pipe(connectedClients[availableConnectedClient].childToParentPipe);
+
       pid_t processId;
+
       if ((processId = fork()) == -1) { // Fork error
         perror("Error when forking a process for a new client");
       }
       else if (processId == 0) { // Child process
-        // wait for file request packet
-        // send requested file
-        if (debugFlag) {
-          printf("Checking UDP socket for new packets...\n");
-        }
-        while (checkUdpSocket(udpSocketDescriptor, &incomingUdpConnection, packet,
-                              debugFlag) == 0) {
-          ;
-        }
-        handlePacket(packet, connectedTcpSocketDescriptor, udpSocketDescriptor,
-                     incomingUdpConnection, debugFlag);
+        close(listeningTcpSocketDescriptor);
+
+        close(connectedClients[availableConnectedClient]
+                  .parentToChildPipe[1]); // Close write on parent -> child.
+        close(connectedClients[availableConnectedClient]
+                  .childToParentPipe[0]); // Close read on child -> parent.
+        char* dataFromParent = calloc(1, 200);
+        read(connectedClients[availableConnectedClient].parentToChildPipe[0],
+             dataFromParent, 200);
+        tcpSendFile(connectedTcpSocketDescriptor, dataFromParent, debugFlag);
         exit(0);
-      }
-      else { // Parent process
       }
     }
 
-    if (checkUdpSocket(udpSocketDescriptor, &incomingUdpConnection, packet, debugFlag)) {
-      // Message in UDP queue
+    // UDP socket readable
+    if (FD_ISSET(udpSocketDescriptor, &readSet)) {
       if (debugFlag) {
         printf("UDP packet received\n");
       }
-      recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
-      handlePacket(packet, listeningTcpSocketDescriptor, udpSocketDescriptor,
-                   serverAddress, debugFlag);
-    }
-  }
-  return 0;
-}
 
+      recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
+
+      handlePacket(packet, listeningTcpSocketDescriptor, udpSocketDescriptor,
+                   serverAddress, &connectedClients[0], debugFlag);
+    }
+  } // while 1
+  return 0;
+} // main
 /*
  * Purpose: Get user input from standard in and remove the newline
  * Input: String to store user input in
  * Output: None
  */
-int getUserInput(char* userInput, int timeoutUs) {
-  /*
+void getUserInput(char* userInput) {
   fgets(userInput, MAX_USER_INPUT, stdin);
   userInput[strcspn(userInput, "\n")] = 0;
-  return 1;
-  */
-
-  fd_set readfds;
-  struct timeval tv;
-
-  // Set up the file descriptor set
-  FD_ZERO(&readfds);
-  FD_SET(STDIN_FILENO, &readfds);
-
-  // Set up the timeout
-  tv.tv_sec  = 0;
-  tv.tv_usec = timeoutUs;
-
-  // Wait for input
-  int ready = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv);
-
-  if (ready == -1) {
-    // Error occurred
-    return -1;
-  }
-  else if (ready == 0) {
-    // Timeout occurred
-    return 0;
-  }
-
-  // Input is available, read it
-  if (fgets(userInput, MAX_USER_INPUT, stdin) == NULL) {
-    return -1;
-  }
-
-  userInput[strcspn(userInput, "\n")] = 0;
-  return 1;
 }
 
 /*
@@ -251,9 +242,7 @@ void setUsername(char* username) {
   while (validUsername == false) {
     validUsername   = true;
     char* userInput = calloc(1, MAX_USER_INPUT);
-    while (getUserInput(userInput, 100) == 0) {
-      ;
-    }
+    getUserInput(userInput);
 
     // System
     if (strcmp(userInput, "0") == 0) {
@@ -264,9 +253,7 @@ void setUsername(char* username) {
     else if (strcmp(userInput, "1") == 0) {
       memset(userInput, 0, MAX_USER_INPUT);
       printf("Custom username chosen, please enter custom username:\n");
-      while (getUserInput(userInput, 100) == 0) {
-        ;
-      }
+      getUserInput(userInput);
       strcpy(username, userInput);
       printf("Welcome %s\n", username);
     }
@@ -277,4 +264,36 @@ void setUsername(char* username) {
     }
     free(userInput);
   }
+}
+
+/*
+ * Purpose: Loop through the connectedClients array until an empty spot is
+ * found. Looks for unset UDP port.
+ * Input: debugFlag
+ * Output:
+ * - -1: All spots in the connected client array are full
+ * - Anything else: Index of the empty spot in the array
+ */
+int findEmptyConnectedClient(struct ConnectedClient* connectedClients, bool debugFlag) {
+  int connectedClientsIndex;
+  for (connectedClientsIndex = 0; connectedClientsIndex < MAX_CONNECTED_CLIENTS;
+       connectedClientsIndex++) {
+    int port = ntohs(connectedClients[connectedClientsIndex].socketUdpAddress.sin_port);
+
+    // Port not set, empty spot
+    if (port == 0) {
+      return connectedClientsIndex;
+      if (debugFlag) {
+        printf("%d is empty\n", connectedClientsIndex);
+      }
+    }
+    else {
+      if (debugFlag) {
+        printf("%d is not empty\n", connectedClientsIndex);
+      }
+    }
+  }
+
+  // All spots filled
+  return -1;
 }

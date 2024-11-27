@@ -10,6 +10,7 @@
 #include "../common/network_node.h"
 #include "../common/packet.h"
 #include "../common/tcp.h"
+#include "../common/udp.h"
 #include "client.h"
 #include "clientPacket.h"
 
@@ -28,6 +29,7 @@ void handlePacket(char* packet,
                   int tcpSocketDescriptor,
                   int udpSocketDescriptor,
                   struct sockaddr_in serverAddress,
+                  struct ConnectedClient* connectedClients,
                   bool debugFlag) {
   struct PacketFields packetFields;
   memset(&packetFields, 0, sizeof(packetFields));
@@ -63,14 +65,15 @@ void handlePacket(char* packet,
       printf("Type of packet received is tcpinfo\n");
     }
     handleClientInfoPacket(tcpSocketDescriptor, udpSocketDescriptor, packetFields.data,
-                           debugFlag);
+                           connectedClients, debugFlag);
     break;
 
   case 4:
     if (debugFlag) {
       printf("Type of packet recieved is filereq\n");
     }
-    handleFileReqPacket(tcpSocketDescriptor, packetFields.data, debugFlag);
+    handleFileReqPacket(tcpSocketDescriptor, packetFields.data, connectedClients,
+                        debugFlag);
 
   default:
   }
@@ -246,11 +249,15 @@ void sendClientInfoPacket(int udpSocketDescriptor,
 void handleClientInfoPacket(int tcpSocketDescriptor,
                             int udpSocketDescriptor,
                             char* dataField,
+                            struct ConnectedClient* connectedClients,
                             bool debugFlag) {
-  struct sockaddr_in fileHostTcpAddress;
-  memset(&fileHostTcpAddress, 0, sizeof(fileHostTcpAddress));
-  struct sockaddr_in fileHostUdpAddress;
-  memset(&fileHostUdpAddress, 0, sizeof(fileHostUdpAddress));
+  int availableConnectedClient = findEmptyConnectedClient(connectedClients, debugFlag);
+
+  if (tcpSocketDescriptor) {
+  }
+
+  if (udpSocketDescriptor) {
+  }
 
   char* end;
   char subfield[64];
@@ -261,18 +268,20 @@ void handleClientInfoPacket(int tcpSocketDescriptor,
   dataField      = readPacketSubfield(dataField, filename, debugFlag);
 
   // TCP address
-  dataField                          = readPacketSubfield(dataField, subfield, debugFlag);
-  long tcpAddress                    = strtol(subfield, &end, 10);
-  fileHostTcpAddress.sin_addr.s_addr = (unsigned int)tcpAddress;
+  dataField       = readPacketSubfield(dataField, subfield, debugFlag);
+  long tcpAddress = strtol(subfield, &end, 10);
+  connectedClients[availableConnectedClient].socketTcpAddress.sin_addr.s_addr =
+      (unsigned int)tcpAddress;
 
   char* end2;
   char subfield2[64];
   memset(subfield2, 0, sizeof(subfield2));
 
   // TCP port
-  dataField                   = readPacketSubfield(dataField, subfield2, debugFlag);
-  long tcpPort                = strtol(subfield2, &end2, 10);
-  fileHostTcpAddress.sin_port = (short unsigned int)tcpPort;
+  dataField    = readPacketSubfield(dataField, subfield2, debugFlag);
+  long tcpPort = strtol(subfield2, &end2, 10);
+  connectedClients[availableConnectedClient].socketTcpAddress.sin_port =
+      (short unsigned int)tcpPort;
 
   char* end3;
   char subfield3[64];
@@ -281,39 +290,99 @@ void handleClientInfoPacket(int tcpSocketDescriptor,
   // UDP address
   dataField       = readPacketSubfield(dataField, subfield3, debugFlag);
   long udpAddress = strtol(subfield3, &end3, 10);
-  fileHostUdpAddress.sin_addr.s_addr = (unsigned int)udpAddress;
+  connectedClients[availableConnectedClient].socketUdpAddress.sin_addr.s_addr =
+      (unsigned int)udpAddress;
 
   char* end4;
   char subfield4[64];
   memset(subfield4, 0, sizeof(subfield4));
 
   // UDP port
-  dataField                   = readPacketSubfield(dataField, subfield4, debugFlag);
-  long udpPort                = strtol(subfield4, &end4, 10);
-  fileHostUdpAddress.sin_port = (short unsigned int)udpPort;
+  dataField    = readPacketSubfield(dataField, subfield4, debugFlag);
+  long udpPort = strtol(subfield4, &end4, 10);
+  connectedClients[availableConnectedClient].socketUdpAddress.sin_port =
+      (short unsigned int)udpPort;
 
-  if (debugFlag) {
-    printf("file host UDP address: %d\n", fileHostUdpAddress.sin_addr.s_addr);
-    printf("file host UDP port: %d\n", fileHostUdpAddress.sin_port);
-  }
+  // Pipes for communication between parent and child process
+  pipe(connectedClients[availableConnectedClient].parentToChildPipe);
+  pipe(connectedClients[availableConnectedClient].childToParentPipe);
 
   // Fork a new process for the client
   pid_t processId;
   if ((processId = fork()) == -1) { // Fork error
     perror("Error when forking a process for a new client");
   }
-
-  // listening
   else if (processId == 0) { // Child process
-    tcpSocketDescriptor =
-        tcpConnect("client", tcpSocketDescriptor, (struct sockaddr*)&fileHostTcpAddress,
-                   sizeof(fileHostTcpAddress));
-    sendFileReqPacket(tcpSocketDescriptor, udpSocketDescriptor, fileHostUdpAddress,
-                      filename, debugFlag);
-    tcpReceiveFile(tcpSocketDescriptor, filename, debugFlag);
+    close(connectedClients[availableConnectedClient]
+              .parentToChildPipe[1]); // Close write on parent -> child.
+    close(connectedClients[availableConnectedClient]
+              .childToParentPipe[0]); // Close read on child -> parent.
+
+    int childTcpListenDescriptor;
+
+    // New TCP socket to receive file
+    struct sockaddr_in childTcpListenAddress;
+    memset(&childTcpListenAddress, 0, sizeof(childTcpListenAddress));
+    childTcpListenAddress.sin_port = 0; // Wildcard
+    childTcpListenDescriptor       = setupTcpSocket(childTcpListenAddress);
+
+    if (debugFlag) {
+      printf("Connecting to client...\n");
+      printf("address: %d",
+             connectedClients[availableConnectedClient].socketTcpAddress.sin_addr.s_addr);
+      printf("port: %d",
+             ntohs(connectedClients[availableConnectedClient].socketTcpAddress.sin_port));
+    }
+
+    // TCP connection to receive
+    childTcpListenDescriptor = tcpConnect(
+        "client", childTcpListenDescriptor,
+        (struct sockaddr*)&connectedClients[availableConnectedClient].socketTcpAddress,
+        sizeof(connectedClients[availableConnectedClient].socketTcpAddress));
+
+    struct PacketFields packetFields;
+    // Packet type
+    strcpy(packetFields.type, "filereq");
+
+    // Filename
+    strcpy(packetFields.data, filename);
+    strcat(packetFields.data, packetDelimiters.subfield);
+
+    char address[64];
+    sprintf(address, "%d", childTcpListenAddress.sin_addr.s_addr);
+    strcat(packetFields.data, address);
+    strcat(packetFields.data, packetDelimiters.subfield);
+
+    char port[64];
+    sprintf(port, "%d", childTcpListenAddress.sin_port);
+    strcat(packetFields.data, port);
+    strcat(packetFields.data, packetDelimiters.subfield);
+
+    char* message = calloc(1, 200);
+    buildPacket(message, packetFields, debugFlag);
+
+    // Tell parent to request file
+    write(connectedClients[availableConnectedClient]
+              .parentToChildPipe[availableConnectedClient],
+          message, (strlen(message) + 1));
+
+    tcpReceiveFile(childTcpListenDescriptor, filename, debugFlag);
     exit(0);
   }
   else { // Parent process
+    // Wait for child to send message through pipe
+    close(connectedClients[availableConnectedClient]
+              .parentToChildPipe[0]); // Close read on parent -> child. Write on
+                                      // this pipe
+    close(connectedClients[availableConnectedClient]
+              .childToParentPipe[1]); // Close write on child -> parent. Read on this pipe
+    char* dataFromChild = calloc(1, 100);
+    read(connectedClients[availableConnectedClient].childToParentPipe[0], dataFromChild,
+         100);
+    // When child sends message, request transmission of file
+    sendUdpMessage(udpSocketDescriptor,
+                   connectedClients[availableConnectedClient].socketUdpAddress,
+                   dataFromChild, debugFlag);
   }
 }
 
@@ -335,10 +404,10 @@ void sendFileReqPacket(int tcpSocketDescriptor,
                        struct sockaddr_in fileHostUdpAddress,
                        char* filename,
                        bool debugFlag) {
-  // Requesting client socket address
-  struct sockaddr_in tcpSocketInfo;
-  socklen_t tcpSocketInfoSize = sizeof(tcpSocketInfo);
-  getsockname(tcpSocketDescriptor, (struct sockaddr*)&tcpSocketInfo, &tcpSocketInfoSize);
+  if (tcpSocketDescriptor) {
+  }
+  if (udpSocketDescriptor) {
+  }
 
   // Request file from file host
   struct PacketFields packetFields;
@@ -347,18 +416,6 @@ void sendFileReqPacket(int tcpSocketDescriptor,
 
   // Filename
   strcpy(packetFields.data, filename);
-  strcat(packetFields.data, packetDelimiters.subfield);
-
-  // Ip address of requesting client
-  char address[64];
-  sprintf(address, "%d", tcpSocketInfo.sin_addr.s_addr);
-  strcat(packetFields.data, address);
-  strcat(packetFields.data, packetDelimiters.subfield);
-
-  // Port of requesting client
-  char port[64];
-  sprintf(port, "%d", tcpSocketInfo.sin_port);
-  strcat(packetFields.data, port);
   strcat(packetFields.data, packetDelimiters.subfield);
 
   sendUdpPacket(udpSocketDescriptor, fileHostUdpAddress, packetFields, debugFlag);
@@ -373,7 +430,13 @@ void sendFileReqPacket(int tcpSocketDescriptor,
  * - Debug flag
  * Output: None
  */
-void handleFileReqPacket(int socketDescriptor, char* dataField, bool debugFlag) {
+void handleFileReqPacket(int socketDescriptor,
+                         char* dataField,
+                         struct ConnectedClient* connectedClients,
+                         bool debugFlag) {
+  if (socketDescriptor) {
+  }
+
   if (debugFlag) {
     printf("Handling file request packet\n");
   }
@@ -381,5 +444,24 @@ void handleFileReqPacket(int socketDescriptor, char* dataField, bool debugFlag) 
   char* filename = calloc(1, MAX_FILENAME);
   dataField      = readPacketSubfield(dataField, filename, debugFlag);
 
-  tcpSendFile(socketDescriptor, filename, debugFlag);
+  char* tcpAddress = calloc(1, 64);
+  dataField        = readPacketSubfield(dataField, tcpAddress, debugFlag);
+
+  char* tcpPort = calloc(1, 64);
+  dataField     = readPacketSubfield(dataField, tcpPort, debugFlag);
+
+  int i;
+  for (i = 0; i < 100; i++) {
+    char clientAddress[64];
+    char clientPort[64];
+
+    sprintf(clientAddress, "%d", connectedClients[i].socketTcpAddress.sin_addr.s_addr);
+    sprintf(clientPort, "%d", connectedClients[i].socketTcpAddress.sin_port);
+
+    if (strcmp(clientAddress, tcpAddress) == 0) {
+      if (strcmp(clientPort, tcpPort) == 0) {
+        write(connectedClients[i].parentToChildPipe[1], filename, (strlen(filename) + 1));
+      }
+    }
+  }
 }

@@ -34,7 +34,8 @@ long int tcpSendBytes(int socketDescriptor,
   }
 
   long int bytesSent = 0;
-  bytesSent          = send(socketDescriptor, buffer, bufferSize, 0);
+  bytesSent          = send(socketDescriptor, buffer, bufferSize, MSG_NOSIGNAL);
+  printf("here");
   if (bytesSent == -1) {
     char* errorMessage = malloc(1024);
     strcpy(errorMessage, strerror(errno));
@@ -89,10 +90,14 @@ void tcpSendFile(int socketDescriptor, char* fileName, bool debugFlag) {
     printf("Put command error when reading file");
   }
   if (debugFlag) {
-    printf("sending %ld bytes", strlen(fileContents));
+    printf("sending %ld bytes\n", strlen(fileContents));
     printf("File contents to send:\n%s", fileContents);
   }
-  tcpSendBytes(socketDescriptor, fileContents, strlen(fileContents), debugFlag);
+  long int bytesSent =
+      tcpSendBytes(socketDescriptor, fileContents, strlen(fileContents), debugFlag);
+  if (debugFlag) {
+    printf("Sent %ld bytes\n", bytesSent);
+  }
 }
 
 // request test01.txt
@@ -111,13 +116,37 @@ long int tcpReceiveFile(int socketDescriptor, char* fileName, bool debugFlag) {
   printf("Receiving file...\n");
   char* incomingFileContents     = malloc(MAX_FILE_SIZE); // Space for file contents
   long int numberOfBytesReceived = 0;                     // How many bytes received
-  while (numberOfBytesReceived == 0 || numberOfBytesReceived == -1) {
-    printf("jereawkljas;edklhjgsadlkjhgadskjhg\n");
-    numberOfBytesReceived =
-        recv(socketDescriptor, incomingFileContents, MAX_FILE_SIZE, 0);
-    if (debugFlag) {
-      printf("Incoming file contents: %s\n", incomingFileContents);
+                                                          /*
+                                                          while (numberOfBytesReceived == 0 || numberOfBytesReceived == -1) {
+                                                            printf("jereawkljas;edklhjgsadlkjhgadskjhg\n");
+                                                            numberOfBytesReceived =
+                                                                recv(socketDescriptor, incomingFileContents, MAX_FILE_SIZE, 0);
+                                                            if (debugFlag) {
+                                                              printf("Incoming file contents: %s\n", incomingFileContents);
+                                                            }
+                                                          }
+                                                          */
+  // numberOfBytesReceived = recv(socketDescriptor, incomingFileContents, MAX_FILE_SIZE,
+  // 0);
+  long int totalBytesReceived = 0;
+  // Keep receiving until we get all the data
+  while (totalBytesReceived < MAX_FILE_SIZE) {
+    long int bytesReceived =
+        recv(socketDescriptor, incomingFileContents + totalBytesReceived,
+             MAX_FILE_SIZE - (long unsigned int)totalBytesReceived, 0);
+
+    if (bytesReceived == -1) {
+      perror("Error receiving file");
+      free(incomingFileContents);
+      return -1;
     }
+
+    if (bytesReceived == 0) {
+      // Connection closed by peer - this might be normal if we got all the data
+      break;
+    }
+
+    totalBytesReceived += bytesReceived;
   }
 
   if (debugFlag) {

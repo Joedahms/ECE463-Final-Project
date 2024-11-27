@@ -265,7 +265,10 @@ void handleClientInfoPacket(int udpSocketDescriptor,
         strcat(packetFields.data, udpPort);
         strcat(packetFields.data, packetDelimiters.subfield);
 
+        printf("tcp port: %d\n", ntohs(connectedClients[i].socketTcpAddress.sin_port));
+
         printf("packet data after handling client info packet: %s\n", packetFields.data);
+        printf("%s\n", packetFields.data);
         sendUdpPacket(udpSocketDescriptor, clientUdpAddress, packetFields, debugFlag);
       }
     }
