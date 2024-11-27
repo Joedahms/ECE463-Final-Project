@@ -276,6 +276,6 @@ int tcpConnect(const char* nodeName,
     printf("Connection to %s failed with error %s\n", nodeName, errorMessage);
     exit(1);
   }
-  printf("Connected to %s...\n", nodeName);
+  printf("Connected to %s\n", nodeName);
   return socketDescriptor;
 }

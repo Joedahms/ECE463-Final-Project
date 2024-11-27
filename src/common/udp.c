@@ -24,7 +24,7 @@ void sendUdpMessage(int udpSocketDescriptor,
                     char* message,
                     bool debugFlag) {
   if (debugFlag) {
-    printf("Sending UDP message:\n");
+    printf("\nSending UDP message:\n");
     printf("%s\n", message);
     printf("To %d:%d\n", ntohl(destinationAddress.sin_addr.s_addr),
            ntohs(destinationAddress.sin_port));
@@ -39,7 +39,7 @@ void sendUdpMessage(int udpSocketDescriptor,
     exit(1);
   }
   else if (debugFlag) {
-    printf("UDP message sent\n");
+    printf("UDP message sent\n\n");
   }
 }
 

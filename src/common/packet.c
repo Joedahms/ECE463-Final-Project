@@ -6,6 +6,7 @@
 #include <sys/types.h>
 
 #include "packet.h"
+#include "udp.h"
 
 static const char* packetTypes[NUM_PACKET_TYPES] = {"connection", "status", "resource",
                                                     "tcpinfo", "filereq"};
@@ -57,7 +58,7 @@ void buildPacket(char* builtPacket, struct PacketFields packetFields, bool debug
   strcpy(builtPacket, packetFields.type);
   strncat(builtPacket, packetDelimiters.field, packetDelimiters.fieldLength);
   if (debugFlag) {
-    printf("Packet after adding type: %s\n", builtPacket);
+    printf("\nPacket after adding type: %s\n", builtPacket);
   }
 
   // Data
@@ -70,7 +71,7 @@ void buildPacket(char* builtPacket, struct PacketFields packetFields, bool debug
   // End
   strncat(builtPacket, packetDelimiters.end, packetDelimiters.endLength);
   if (debugFlag) {
-    printf("Entire packet: %s\n", builtPacket);
+    printf("Entire packet: %s\n\n", builtPacket);
   }
 }
 
@@ -109,7 +110,7 @@ int readPacket(char* packetToBeRead, struct PacketFields* packetFields, bool deb
  */
 char* readPacketField(char* packet, char* field, bool debugFlag) {
   if (debugFlag) {
-    printf("Reading field from packet: %s\n", packet);
+    printf("\nReading field from packet: %s\n", packet);
   }
 
   while (strncmp(packet, packetDelimiters.field, packetDelimiters.fieldLength) != 0) {
@@ -119,7 +120,7 @@ char* readPacketField(char* packet, char* field, bool debugFlag) {
   packet += packetDelimiters.fieldLength;
 
   if (debugFlag) {
-    printf("Field read: %s\n", field);
+    printf("Field read: %s\n\n", field);
   }
   return packet;
 }
@@ -134,7 +135,7 @@ char* readPacketField(char* packet, char* field, bool debugFlag) {
  */
 char* readPacketSubfield(char* field, char* subfield, bool debugFlag) {
   if (debugFlag) {
-    printf("Reading subfield from packet field: %s\n", field);
+    printf("\nReading subfield from packet field: %s\n", field);
   }
 
   while (strncmp(field, packetDelimiters.subfield, packetDelimiters.subfieldLength) !=
@@ -148,7 +149,7 @@ char* readPacketSubfield(char* field, char* subfield, bool debugFlag) {
   field += packetDelimiters.subfieldLength;
 
   if (debugFlag) {
-    printf("Subfield read: %s\n", subfield);
+    printf("Subfield read: %s\n\n", subfield);
   }
   return field;
 }

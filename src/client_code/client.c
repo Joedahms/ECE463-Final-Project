@@ -65,19 +65,15 @@ int main(int argc, char* argv[]) {
     printf("Error sending connection packet\n");
   }
 
-  //  struct sockaddr_in incomingTcpConnection;
-  //  struct sockaddr_in incomingUdpConnection;
   char* userInput = calloc(1, MAX_USER_INPUT);
   packet          = calloc(1, MAX_PACKET);
 
   int maxFileDescriptor;
   fd_set readSet;
-  FD_ZERO(&readSet);
-
-  // pid_t processId;
 
   // Loop to handle user input and incoming packets
   while (1) {
+    FD_ZERO(&readSet);
     FD_SET(0, &readSet); // stdin
     FD_SET(udpSocketDescriptor, &readSet);
     FD_SET(listeningTcpSocketDescriptor, &readSet);
@@ -85,8 +81,11 @@ int main(int argc, char* argv[]) {
     maxFileDescriptor = (listeningTcpSocketDescriptor > udpSocketDescriptor)
                             ? listeningTcpSocketDescriptor
                             : udpSocketDescriptor;
+    if (maxFileDescriptor) {
+    }
 
-    int selectReturn = select(maxFileDescriptor + 1, &readSet, NULL, NULL, NULL);
+    int selectReturn = select(100, &readSet, NULL, NULL, NULL);
+    printf("Select return: %d\n", selectReturn);
 
     if (selectReturn < 0 && errno != EINTR) {
       perror("select error");
@@ -99,10 +98,20 @@ int main(int argc, char* argv[]) {
 
     // TCP socket readable
     if (FD_ISSET(listeningTcpSocketDescriptor, &readSet)) {
-      connectedTcpSocketDescriptor = accept(listeningTcpSocketDescriptor, NULL, NULL);
-      if (debugFlag) {
-        printf("File being requested, new TCP connection established\n");
+      printf("New TCP connection\n");
+      int i;
+      for (i = 0; i < 50; i++) {
+        connectedTcpSocketDescriptor = accept(listeningTcpSocketDescriptor, NULL, NULL);
+        if (connectedTcpSocketDescriptor == -1) {
+          perror("Accept failed");
+        }
+        printf("Connected TCP socket after accept: %d\n", connectedTcpSocketDescriptor);
       }
+      /*
+    if (debugFlag) {
+      printf("File being requested, new TCP connection established\n");
+    }
+  */
       int availableConnectedClient =
           findEmptyConnectedClient(connectedClients, debugFlag);
 

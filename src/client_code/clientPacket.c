@@ -313,32 +313,59 @@ void handleClientInfoPacket(int tcpSocketDescriptor,
     perror("Error when forking a process for a new client");
   }
   else if (processId == 0) { // Child process
+    printf("In child process\n");
     close(connectedClients[availableConnectedClient]
               .parentToChildPipe[1]); // Close write on parent -> child.
     close(connectedClients[availableConnectedClient]
               .childToParentPipe[0]); // Close read on child -> parent.
-
-    int childTcpListenDescriptor;
+    close(tcpSocketDescriptor);
 
     // New TCP socket to receive file
-    struct sockaddr_in childTcpListenAddress;
-    memset(&childTcpListenAddress, 0, sizeof(childTcpListenAddress));
-    childTcpListenAddress.sin_port = 0; // Wildcard
-    childTcpListenDescriptor       = setupTcpSocket(childTcpListenAddress);
+    // struct sockaddr_in childTcpListenAddress;
+    // memset(&childTcpListenAddress, 0, sizeof(childTcpListenAddress));
+    // childTcpListenAddress.sin_port = 0; // Wildcard
+    // childTcpListenDescriptor       = setupTcpSocket(childTcpListenAddress);
+    // Set up TCP socket
+    printf("Setting up TCP socket...\n");
+    int childSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (childSocket == -1) {
+      perror("Error when setting up TCP socket");
+      exit(1);
+    }
 
     if (debugFlag) {
-      printf("Connecting to client...\n");
-      printf("address: %d",
-             connectedClients[availableConnectedClient].socketTcpAddress.sin_addr.s_addr);
-      printf("port: %d",
+      printf("\nConnecting to client...\n");
+      printf("Address: %d\n", ntohl(connectedClients[availableConnectedClient]
+                                        .socketTcpAddress.sin_addr.s_addr));
+      printf("Port: %d\n\n",
              ntohs(connectedClients[availableConnectedClient].socketTcpAddress.sin_port));
     }
 
     // TCP connection to receive
-    childTcpListenDescriptor = tcpConnect(
-        "client", childTcpListenDescriptor,
+    /*
+    childSocket = tcpConnect(
+        "client", childSocket,
         (struct sockaddr*)&connectedClients[availableConnectedClient].socketTcpAddress,
         sizeof(connectedClients[availableConnectedClient].socketTcpAddress));
+        */
+    socklen_t size = sizeof(connectedClients[availableConnectedClient].socketTcpAddress);
+    int connectReturn = connect(
+        childSocket,
+        (struct sockaddr*)&connectedClients[availableConnectedClient].socketTcpAddress,
+        size);
+    printf("Connected with code %d", connectReturn);
+
+    usleep(2000000);
+
+    struct sockaddr_in childTcpAddress;
+    memset(&childTcpAddress, 0, sizeof(childTcpAddress));
+    socklen_t addrSize = sizeof(childTcpAddress);
+    if (getsockname(childSocket, (struct sockaddr*)&childTcpAddress, &addrSize) == -1) {
+      perror("getsockname error");
+    }
+
+    printf("\nChild TCP address: %d\n", ntohl(childTcpAddress.sin_addr.s_addr));
+    printf("Child TCP port: %d\n\n", ntohs(childTcpAddress.sin_port));
 
     struct PacketFields packetFields;
     // Packet type
@@ -349,24 +376,28 @@ void handleClientInfoPacket(int tcpSocketDescriptor,
     strcat(packetFields.data, packetDelimiters.subfield);
 
     char address[64];
-    sprintf(address, "%d", childTcpListenAddress.sin_addr.s_addr);
+    sprintf(address, "%d", childTcpAddress.sin_addr.s_addr);
     strcat(packetFields.data, address);
     strcat(packetFields.data, packetDelimiters.subfield);
 
     char port[64];
-    sprintf(port, "%d", childTcpListenAddress.sin_port);
+    sprintf(port, "%d", childTcpAddress.sin_port);
     strcat(packetFields.data, port);
     strcat(packetFields.data, packetDelimiters.subfield);
 
     char* message = calloc(1, 200);
     buildPacket(message, packetFields, debugFlag);
 
+    printf("\nAsking parent to send: %s\n", message);
     // Tell parent to request file
-    write(connectedClients[availableConnectedClient]
-              .parentToChildPipe[availableConnectedClient],
-          message, (strlen(message) + 1));
+    long int bytesWritten =
+        write(connectedClients[availableConnectedClient].childToParentPipe[1], message,
+              (strlen(message) + 1));
+    printf("%ld bytes sent to parent\n\n", bytesWritten);
 
-    tcpReceiveFile(childTcpListenDescriptor, filename, debugFlag);
+    usleep(1000000);
+
+    tcpReceiveFile(childSocket, filename, debugFlag);
     exit(0);
   }
   else { // Parent process
@@ -379,6 +410,7 @@ void handleClientInfoPacket(int tcpSocketDescriptor,
     char* dataFromChild = calloc(1, 100);
     read(connectedClients[availableConnectedClient].childToParentPipe[0], dataFromChild,
          100);
+    printf("received data from child: %s\n", dataFromChild);
     // When child sends message, request transmission of file
     sendUdpMessage(udpSocketDescriptor,
                    connectedClients[availableConnectedClient].socketUdpAddress,
@@ -405,8 +437,6 @@ void sendFileReqPacket(int tcpSocketDescriptor,
                        char* filename,
                        bool debugFlag) {
   if (tcpSocketDescriptor) {
-  }
-  if (udpSocketDescriptor) {
   }
 
   // Request file from file host
@@ -460,6 +490,7 @@ void handleFileReqPacket(int socketDescriptor,
 
     if (strcmp(clientAddress, tcpAddress) == 0) {
       if (strcmp(clientPort, tcpPort) == 0) {
+        printf("Writing filename to child: %s\n", filename);
         write(connectedClients[i].parentToChildPipe[1], filename, (strlen(filename) + 1));
       }
     }
