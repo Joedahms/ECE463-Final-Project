@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -314,6 +315,18 @@ void handleClientInfoPacket(int tcpSocketDescriptor,
   }
   else if (processId == 0) { // Child process
     printf("In child process\n");
+
+    int childSocket;
+    printf("Setting up TCP socket...\n");
+    childSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (childSocket == -1) {
+      perror("Error when setting up TCP socket");
+      exit(1);
+    }
+    else {
+      printf("Child socket setup: %d\n", childSocket);
+    }
+
     close(connectedClients[availableConnectedClient]
               .parentToChildPipe[1]); // Close write on parent -> child.
     close(connectedClients[availableConnectedClient]
@@ -326,11 +339,14 @@ void handleClientInfoPacket(int tcpSocketDescriptor,
     // childTcpListenAddress.sin_port = 0; // Wildcard
     // childTcpListenDescriptor       = setupTcpSocket(childTcpListenAddress);
     // Set up TCP socket
-    printf("Setting up TCP socket...\n");
-    int childSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (childSocket == -1) {
-      perror("Error when setting up TCP socket");
-      exit(1);
+
+    // Set non blocking
+    int fcntlReturn = fcntl(childSocket, F_SETFL, O_NONBLOCK);
+    if (fcntlReturn == -1) {
+      perror("Error when setting TCP socket to non blocking");
+    }
+    else {
+      printf("Child socket set to non blocking\n");
     }
 
     if (debugFlag) {
