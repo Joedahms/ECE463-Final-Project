@@ -4,7 +4,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-
+#include "udp.h"
 #include "packet.h"
 
 static const char* packetTypes[NUM_PACKET_TYPES] = {"connection", "status", "resource",

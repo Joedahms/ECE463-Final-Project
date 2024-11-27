@@ -1,5 +1,5 @@
 CFLAGS = -c -g -Wall -Wextra -Werror -Wshadow -Wdouble-promotion -Wformat=2 -Wformat-overflow \
-				 -Wformat-truncation -fno-common -Wconversion
+         -Wformat-truncation -fno-common -Wconversion
 S = src/server_code/
 CL = src/client_code/
 CO = src/common/
@@ -45,9 +45,7 @@ serverPacket.o: $(S)serverPacket.c $(S)serverPacket.h
 	gcc $(CFLAGS) $(S)serverPacket.c
 
 clean:
-	rm client_test_directory01/client
-	rm $(CLTEST)/client	# Only removing the executable
-	rm $(STEST)/server
-	rm *.o
-
-# request test01.txt
+	rm -f client_test_directory01/client
+	rm -f $(CLTEST)/client
+	rm -f $(STEST)/server
+	rm -f *.o
