@@ -175,7 +175,7 @@ int setupTcpSocket(struct sockaddr_in hostAddress) {
   int tcpSocketDescriptor;
 
   // Set up TCP socket
-  printf("Setting up TCP socket...\n");
+  printf("\nSetting up TCP socket...\n");
   tcpSocketDescriptor = socket(AF_INET, SOCK_STREAM, 0);
   if (tcpSocketDescriptor == -1) {
     perror("Error when setting up TCP socket");
@@ -205,6 +205,10 @@ int setupTcpSocket(struct sockaddr_in hostAddress) {
     perror("TCP socket listen error");
     exit(1);
   }
+  struct sockaddr_in listening;
+  listening = getTcpSocketInfo(tcpSocketDescriptor);
+  printf("TCP listening on %d:%d\n\n", ntohl(listening.sin_addr.s_addr),
+         ntohs(listening.sin_port));
   return tcpSocketDescriptor;
 }
 

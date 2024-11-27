@@ -49,5 +49,4 @@ clean:
 	rm $(CLTEST)/client	# Only removing the executable
 	rm $(STEST)/server
 	rm *.o
-c
 # request test01.txt

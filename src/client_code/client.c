@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -68,36 +69,26 @@ int main(int argc, char* argv[]) {
   char* userInput = calloc(1, MAX_USER_INPUT);
   packet          = calloc(1, MAX_PACKET);
 
-  int maxFileDescriptor;
-  fd_set readSet;
+  struct pollfd clientPoll[20];
+  clientPoll[0].fd     = udpSocketDescriptor;
+  clientPoll[0].events = POLLRDNORM;
+  clientPoll[1].fd     = listeningTcpSocketDescriptor;
+  clientPoll[1].events = POLLRDNORM;
+  clientPoll[2].fd     = STDIN_FILENO;
+  clientPoll[2].events = POLLRDNORM;
 
   // Loop to handle user input and incoming packets
   while (1) {
-    FD_ZERO(&readSet);
-    FD_SET(0, &readSet); // stdin
-    FD_SET(udpSocketDescriptor, &readSet);
-    FD_SET(listeningTcpSocketDescriptor, &readSet);
+    int pollReturn = poll(clientPoll, 3, -1); // Max is 2 + 1, Infinite wait
+    printf("Poll return: %d\n", pollReturn);
 
-    maxFileDescriptor = (listeningTcpSocketDescriptor > udpSocketDescriptor)
-                            ? listeningTcpSocketDescriptor
-                            : udpSocketDescriptor;
-    if (maxFileDescriptor) {
-    }
-
-    int selectReturn = select(100, &readSet, NULL, NULL, NULL);
-    printf("Select return: %d\n", selectReturn);
-
-    if (selectReturn < 0 && errno != EINTR) {
-      perror("select error");
-    }
-
-    if (FD_ISSET(0, &readSet)) {
+    if (clientPoll[2].revents && POLLRDNORM) {
       getUserInput(userInput);
       handleUserInput(userInput, serverAddress, debugFlag);
     }
 
     // TCP socket readable
-    if (FD_ISSET(listeningTcpSocketDescriptor, &readSet)) {
+    if (clientPoll[1].revents && POLLRDNORM) {
       printf("New TCP connection\n");
       int i;
       for (i = 0; i < 50; i++) {
@@ -107,11 +98,6 @@ int main(int argc, char* argv[]) {
         }
         printf("Connected TCP socket after accept: %d\n", connectedTcpSocketDescriptor);
       }
-      /*
-    if (debugFlag) {
-      printf("File being requested, new TCP connection established\n");
-    }
-  */
       int availableConnectedClient =
           findEmptyConnectedClient(connectedClients, debugFlag);
 
@@ -140,7 +126,7 @@ int main(int argc, char* argv[]) {
     }
 
     // UDP socket readable
-    if (FD_ISSET(udpSocketDescriptor, &readSet)) {
+    if (clientPoll[0].revents && POLLRDNORM) {
       if (debugFlag) {
         printf("UDP packet received\n");
       }
