@@ -51,8 +51,10 @@ int main(int argc, char* argv[]) {
 
   // Local TCP port
   struct sockaddr_in hostTcpAddress;
+  /*
   memset(&hostTcpAddress, 0, sizeof(hostTcpAddress));
   hostTcpAddress.sin_port      = 0; // Wildcard
+  // */
   listeningTcpSocketDescriptor = setupTcpSocket(hostTcpAddress);
 
   hostTcpAddress = getTcpSocketInfo(listeningTcpSocketDescriptor);
@@ -72,15 +74,17 @@ int main(int argc, char* argv[]) {
 
   int maxFileDescriptor;
   fd_set readSet;
-  FD_ZERO(&readSet);
 
   // pid_t processId;
 
   // Loop to handle user input and incoming packets
   while (1) {
+    FD_ZERO(&readSet);
     FD_SET(0, &readSet); // stdin
     FD_SET(udpSocketDescriptor, &readSet);
     FD_SET(listeningTcpSocketDescriptor, &readSet);
+
+    printf("Listening TCP socket: %d\n", listeningTcpSocketDescriptor);
 
     maxFileDescriptor = (listeningTcpSocketDescriptor > udpSocketDescriptor)
                             ? listeningTcpSocketDescriptor
@@ -98,8 +102,10 @@ int main(int argc, char* argv[]) {
     }
 
     // TCP socket readable
-    if (FD_ISSET(listeningTcpSocketDescriptor, &readSet)) {
-      connectedTcpSocketDescriptor = accept(listeningTcpSocketDescriptor, NULL, NULL);
+    // if (FD_ISSET(listeningTcpSocketDescriptor, &readSet)) {
+    connectedTcpSocketDescriptor = accept(listeningTcpSocketDescriptor, NULL, NULL);
+    if (connectedTcpSocketDescriptor != -1) {
+      printf("HHHHHHHHHHH\n");
       if (debugFlag) {
         printf("File being requested, new TCP connection established\n");
       }
@@ -128,19 +134,24 @@ int main(int argc, char* argv[]) {
         tcpSendFile(connectedTcpSocketDescriptor, dataFromParent, debugFlag);
         exit(0);
       }
+      else {
+        close(connectedTcpSocketDescriptor);
+      }
     }
+    //}
 
     // UDP socket readable
-    if (FD_ISSET(udpSocketDescriptor, &readSet)) {
-      if (debugFlag) {
-        printf("UDP packet received\n");
-      }
-
-      recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
-
-      handlePacket(packet, listeningTcpSocketDescriptor, udpSocketDescriptor,
-                   serverAddress, &connectedClients[0], debugFlag);
+    //    if (FD_ISSET(udpSocketDescriptor, &readSet)) {
+    printf("JJJJJJJJJJJJJJjj\n");
+    if (debugFlag) {
+      printf("UDP packet received\n");
     }
+
+    recvfrom(udpSocketDescriptor, packet, MAX_PACKET, 0, NULL, NULL);
+
+    handlePacket(packet, listeningTcpSocketDescriptor, udpSocketDescriptor, serverAddress,
+                 &connectedClients[0], debugFlag);
+    //}
   } // while 1
   return 0;
 } // main
