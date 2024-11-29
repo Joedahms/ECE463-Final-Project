@@ -114,26 +114,21 @@ void tcpSendFile(int socketDescriptor, char* fileName, bool debugFlag) {
  */
 long int tcpReceiveFile(int socketDescriptor, char* fileName, bool debugFlag) {
   printf("Receiving file...\n");
-  char* incomingFileContents     = malloc(MAX_FILE_SIZE); // Space for file contents
-  long int numberOfBytesReceived = 0;                     // How many bytes received
-                                                          /*
-                                                          while (numberOfBytesReceived == 0 || numberOfBytesReceived == -1) {
-                                                            printf("jereawkljas;edklhjgsadlkjhgadskjhg\n");
-                                                            numberOfBytesReceived =
-                                                                recv(socketDescriptor, incomingFileContents, MAX_FILE_SIZE, 0);
-                                                            if (debugFlag) {
-                                                              printf("Incoming file contents: %s\n", incomingFileContents);
-                                                            }
-                                                          }
-                                                          */
-  // numberOfBytesReceived = recv(socketDescriptor, incomingFileContents, MAX_FILE_SIZE,
-  // 0);
+
+  // Allocate buffer for incoming file contents
+  char* incomingFileContents = malloc(MAX_FILE_SIZE);
+  if (!incomingFileContents) {
+    perror("Error allocating memory for file contents");
+    return -1;
+  }
+
   long int totalBytesReceived = 0;
-  // Keep receiving until we get all the data
+
+  // Receive data until the end of the file or buffer is full
   while (totalBytesReceived < MAX_FILE_SIZE) {
     long int bytesReceived =
         recv(socketDescriptor, incomingFileContents + totalBytesReceived,
-             MAX_FILE_SIZE - (long unsigned int)totalBytesReceived, 0);
+             MAX_FILE_SIZE - totalBytesReceived, 0);
 
     if (bytesReceived == -1) {
       perror("Error receiving file");
@@ -142,7 +137,7 @@ long int tcpReceiveFile(int socketDescriptor, char* fileName, bool debugFlag) {
     }
 
     if (bytesReceived == 0) {
-      // Connection closed by peer - this might be normal if we got all the data
+      // Connection closed by peer
       break;
     }
 
@@ -150,19 +145,20 @@ long int tcpReceiveFile(int socketDescriptor, char* fileName, bool debugFlag) {
   }
 
   if (debugFlag) {
-    printf("Received file is %ld bytes\n", numberOfBytesReceived);
-    printf("Contents of received file:\n%s\n", incomingFileContents);
+    printf("Received file is %ld bytes\n", totalBytesReceived);
   }
 
-  int writeFileReturn = writeFile(fileName, incomingFileContents,
-                                  (long unsigned int)numberOfBytesReceived, debugFlag);
+  // Write received data to file
+  int writeFileReturn = writeFile(fileName, incomingFileContents, totalBytesReceived, debugFlag);
+  free(incomingFileContents); // Free allocated memory
+
   if (writeFileReturn == -1) {
+    printf("Failed to write file %s\n", fileName);
     return -1;
   }
-  else {
-    printf("Received file\n");
-  }
-  return 0;
+
+  printf("File successfully received and written: %s\n", fileName);
+  return totalBytesReceived;
 }
 
 /*

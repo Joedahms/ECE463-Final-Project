@@ -36,46 +36,48 @@ void handlePacket(char* packet,
   readPacket(packet, &packetFields, debugFlag);
 
   int packetType = getPacketType(packetFields.type, debugFlag);
+  
+  printf("Connection packet resources: %s\n", packetFields.data);
   switch (packetType) {
-  // Connection
-  case 0:
-    if (debugFlag) {
-      printf("Type of packet recieved is connection\n");
-    }
-    break;
+    case 0: // Connection
+      if (debugFlag) {
+        printf("Type of packet received is 'connection'\n");
+      }
+      break;
 
-  // Status
-  case 1:
-    if (debugFlag) {
-      printf("Type of packet received is status\n");
-    }
-    handleStatusPacket(udpSocketDescriptor, serverAddress, debugFlag);
-    break;
+    case 1: // Status
+      if (debugFlag) {
+        printf("Type of packet received is 'status'\n");
+      }
+      handleStatusPacket(udpSocketDescriptor, serverAddress, debugFlag);
+      break;
 
-  // Resource
-  case 2:
-    if (debugFlag) {
-      printf("Type of packet received is Resource\n");
-    }
-    handleResourcePacket(packetFields.data, debugFlag);
-    break;
+    case 2: // Resource
+      if (debugFlag) {
+        printf("Type of packet received is 'resource'\n");
+      }
+      handleResourcePacket(packetFields.data, debugFlag);
+      break;
 
-  case 3:
-    if (debugFlag) {
-      printf("Type of packet received is tcpinfo\n");
-    }
-    handleClientInfoPacket(tcpSocketDescriptor, udpSocketDescriptor, packetFields.data,
-                           connectedClients, debugFlag);
-    break;
+    case 3: // TCP Info
+      if (debugFlag) {
+        printf("Type of packet received is 'tcpinfo'\n");
+      }
+      handleClientInfoPacket(tcpSocketDescriptor, udpSocketDescriptor, packetFields.data,
+                             connectedClients, debugFlag);
+      break;
 
-  case 4:
-    if (debugFlag) {
-      printf("Type of packet recieved is filereq\n");
-    }
-    handleFileReqPacket(tcpSocketDescriptor, packetFields.data, connectedClients,
-                        debugFlag);
+    case 4: // File Request
+      if (debugFlag) {
+        printf("Type of packet received is 'filereq'\n");
+      }
+      handleFileReqPacket(tcpSocketDescriptor, packetFields.data, connectedClients,
+                          debugFlag);
+      break;
 
-  default:
+    default:
+      fprintf(stderr, "Unknown packet type received: %s\n", packetFields.type);
+      break;
   }
 }
 
@@ -207,12 +209,26 @@ int sendConnectionPacket(int udpSocketDescriptor,
 void handleStatusPacket(int udpSocketDescriptor,
                         struct sockaddr_in serverAddress,
                         bool debugFlag) {
-  struct PacketFields packetFields;
-  memset(&packetFields, 0, sizeof(packetFields));
-  strcpy(packetFields.type, "status");
-  strcat(packetFields.data, "testing");
+  static bool hasRespondedToStatus = false; // Static variable to persist across calls
 
-  sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
+  if (!hasRespondedToStatus) {
+    if (debugFlag) {
+      printf("Received 'status' packet from server. Sending response.\n");
+    }
+
+    struct PacketFields packetFields;
+    memset(&packetFields, 0, sizeof(packetFields));
+    strcpy(packetFields.type, "status");
+    strcat(packetFields.data, "acknowledged");
+
+    sendUdpPacket(udpSocketDescriptor, serverAddress, packetFields, debugFlag);
+
+    hasRespondedToStatus = true; // Mark that a response was sent
+  } else {
+    if (debugFlag) {
+      printf("Ignoring subsequent 'status' packets to prevent response loop.\n");
+    }
+  }
 }
 
 /*
@@ -461,34 +477,66 @@ void handleFileReqPacket(int socketDescriptor,
                          char* dataField,
                          struct ConnectedClient* connectedClients,
                          bool debugFlag) {
-  if (socketDescriptor) {
+  if (debugFlag) {
+    printf("Handling file request packet...\n");
   }
+
+  // Allocate memory for parsing fields
+  char* filename = calloc(1, MAX_FILENAME);
+  char* tcpAddress = calloc(1, 64);
+  char* tcpPort = calloc(1, 64);
+
+  if (!filename || !tcpAddress || !tcpPort) {
+    perror("Memory allocation failed");
+    free(filename);
+    free(tcpAddress);
+    free(tcpPort);
+    return;
+  }
+  if (debugFlag) {
+  printf("Requested filename: %s\n", filename);
+  }
+  // Parse fields from the dataField
+  dataField = readPacketSubfield(dataField, filename, debugFlag);
+  dataField = readPacketSubfield(dataField, tcpAddress, debugFlag);
+  dataField = readPacketSubfield(dataField, tcpPort, debugFlag);
 
   if (debugFlag) {
-    printf("Handling file request packet\n");
+    printf("Requested filename: %s\n", filename);
+    printf("Requester TCP address: %s\n", tcpAddress);
+    printf("Requester TCP port: %s\n", tcpPort);
   }
 
-  char* filename = calloc(1, MAX_FILENAME);
-  dataField      = readPacketSubfield(dataField, filename, debugFlag);
-
-  char* tcpAddress = calloc(1, 64);
-  dataField        = readPacketSubfield(dataField, tcpAddress, debugFlag);
-
-  char* tcpPort = calloc(1, 64);
-  dataField     = readPacketSubfield(dataField, tcpPort, debugFlag);
-
+  // Search for the client in the connectedClients array
   int i;
-  for (i = 0; i < 100; i++) {
+  bool clientFound = false;
+  for (i = 0; i < MAX_CONNECTED_CLIENTS; i++) {
     char clientAddress[64];
     char clientPort[64];
 
     sprintf(clientAddress, "%d", connectedClients[i].socketTcpAddress.sin_addr.s_addr);
-    sprintf(clientPort, "%d", connectedClients[i].socketTcpAddress.sin_port);
+    sprintf(clientPort, "%d", ntohs(connectedClients[i].socketTcpAddress.sin_port));
 
-    if (strcmp(clientAddress, tcpAddress) == 0) {
-      if (strcmp(clientPort, tcpPort) == 0) {
-        write(connectedClients[i].parentToChildPipe[1], filename, (strlen(filename) + 1));
+    if (strcmp(clientAddress, tcpAddress) == 0 && strcmp(clientPort, tcpPort) == 0) {
+      clientFound = true;
+
+      // Write the filename to the client's parent-to-child pipe
+      ssize_t bytesWritten = write(connectedClients[i].parentToChildPipe[1], filename, strlen(filename) + 1);
+      if (bytesWritten == -1) {
+        perror("Error writing to pipe");
+      } else if (debugFlag) {
+        printf("Filename sent to client: %s\n", filename);
       }
+      break;
     }
   }
+
+  if (!clientFound && debugFlag) {
+    printf("No matching client found for address %s and port %s\n", tcpAddress, tcpPort);
+  }
+
+  // Free allocated memory
+  free(filename);
+  free(tcpAddress);
+  free(tcpPort);
 }

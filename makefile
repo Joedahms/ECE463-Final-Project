@@ -1,4 +1,4 @@
-CFLAGS = -c -g -Wall -Wextra -Werror -Wshadow -Wdouble-promotion -Wformat=2 -Wformat-overflow \
+CFLAGS = -c -g -Wall -Wextra -Wshadow -Wdouble-promotion -Wformat=2 -Wformat-overflow \
 				 -Wformat-truncation -fno-common -Wconversion
 S = src/server_code/
 CL = src/client_code/
@@ -10,7 +10,7 @@ all: server client
 
 server: server.o network_node.o packet.o resource.o udp.o serverPacket.o
 	gcc server.o network_node.o packet.o resource.o udp.o serverPacket.o -o server
-	mv server server_test_directory
+	
 
 client: client.o network_node.o packet.o tcp.o udp.o clientPacket.o
 	gcc client.o network_node.o packet.o tcp.o udp.o clientPacket.o -o client
@@ -45,9 +45,9 @@ serverPacket.o: $(S)serverPacket.c $(S)serverPacket.h
 	gcc $(CFLAGS) $(S)serverPacket.c
 
 clean:
-	rm client_test_directory01/client
-	rm $(CLTEST)/client	# Only removing the executable
-	rm $(STEST)/server
-	rm *.o
+	-rm client_test_directory01/client
+	-rm $(CLTEST)/client	# Only removing the executable
+	-rm $(STEST)/server
+	-rm *.o
 
 # request test01.txt

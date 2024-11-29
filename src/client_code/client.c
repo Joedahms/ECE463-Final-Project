@@ -100,6 +100,15 @@ int main(int argc, char* argv[]) {
       getUserInput(userInput);
       handleUserInput(userInput, serverAddress, debugFlag);
     }
+    if (FD_ISSET(listeningTcpSocketDescriptor, &readSet)) {
+    connectedTcpSocketDescriptor = accept(listeningTcpSocketDescriptor, NULL, NULL);
+    if (connectedTcpSocketDescriptor != -1) {
+        printf("New TCP connection established.\n");
+    } else {
+        perror("Error accepting TCP connection");
+    }
+    }
+
 
     // TCP socket readable
     // if (FD_ISSET(listeningTcpSocketDescriptor, &readSet)) {
@@ -214,27 +223,37 @@ void shutdownClient() {
  * - 0: Success
  */
 int getAvailableResources(char* availableResources, const char* directoryName) {
+  // Open the directory
   DIR* directoryStream = opendir(directoryName);
   if (directoryStream == NULL) {
-    return -1;
     perror("Error opening resource directory");
+    return -1;
   }
 
-  // Loop through entire directory
+  // Loop through the directory
   struct dirent* directoryEntry;
   while ((directoryEntry = readdir(directoryStream)) != NULL) {
     const char* entryName = directoryEntry->d_name;
-    // Ignore current directory
-    if (strcmp(entryName, ".") == 0) {
+
+    // Ignore current and parent directories
+    if (strcmp(entryName, ".") == 0 || strcmp(entryName, "..") == 0) {
       continue;
     }
-    // Ignore parent directory
-    if (strcmp(entryName, "..") == 0) {
-      continue;
+
+    // Check if adding this entry would overflow the buffer
+    if (strlen(availableResources) + strlen(entryName) + packetDelimiters.subfieldLength >= MAX_DATA) {
+      printf("Buffer overflow detected in availableResources\n");
+      closedir(directoryStream);
+      return -1;
     }
+
     strcat(availableResources, entryName);
     strcat(availableResources, packetDelimiters.subfield);
   }
+
+  // Close the directory
+  closedir(directoryStream);
+
   return 0;
 }
 
